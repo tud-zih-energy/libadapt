@@ -1,0 +1,33 @@
+(1) run
+	cmake <additional flags> <path_to_sources>
+
+additional flags might be:
+
+Select Build Type:
+	-DCMAKE_BUILD_TYPE=<Release|Debug>
+	
+Define installation directory of libconfig
+	-DCFG_DIR=<libconfig install path>
+	alternatively:
+	-DCFG_INC=<libconfig include path>
+	-DCFG_LIB=<libconfig library path>
+	
+Define installation directory of libcpufreq
+	-DCPU_DIR=<libcpufreq install path>
+	alternatively:
+	-DCPU_INC=<libcpufreq include path>
+	-DCPU_LIB=<libcpufreq library path>
+	
+Define installation directory of libx86_adapt
+	-DXA_DIR=<libx86_adapt install path>
+	alternatively:
+	-DXA_INC=<libx86_adapt include path>
+	-DXA_LIB=<libx86_adapt library path>
+	
+Disable x86_adapt which is not so common
+  -DNO_X86_ADAPT=yes
+  
+Disable cpu frequency changing
+  -DNO_CPUFREQ=yes
+
+(2) run make

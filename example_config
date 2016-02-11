@@ -1,0 +1,82 @@
+init:
+{
+	# no initial settings
+}
+
+default:
+{
+	# no default settings
+}
+
+binary_0:
+{
+	# settings for this binary
+	name = "/home/rschoene/coolsilicon/a.out";
+	function_0:
+	{
+		name="!$omp parallel @test.c:7";
+		# change number of threads before entering the region
+		dct_threads_before = 2;
+		# change number of threads after exiting the region
+		dct_threads_after = 3;
+		# change frequency before and after
+		dvfs_freq_before= 1866000; 
+		dvfs_freq_after= 1600000;
+		# change settings from cc device driver
+		x86_adapt_AMD_Stride_Prefetch_before = 1;
+		x86_adapt_AMD_Stride_Prefetch_after = 0;
+
+		# write something to this file whenever a region is entered
+		file_0:
+		{
+			name="/sys/devices/system/cpu/cpu0/cpuidle/state4/disable";
+			before="1";
+			after="0";
+			# offset (int) would be an additional parameter that is not used here
+		};
+	};
+};
+binary_1:
+{
+	# settings for this binary
+	name = "/home/rschoene/NPB3.3.1/NPB3.3-OMP/bin/bt.A.x";
+	function_0:
+	{
+		name="parallel region execute 51232";
+		# change frequency before and after
+		dvfs_freq_before= 1300000;
+		dvfs_freq_after= 2200000;
+	};
+};
+binary_2:
+{
+	# settings for this binary
+	name = "/home/rschoene/NPB3.3.1/NPB3.3-OMP/bin/ua.A.x";
+	function_0:
+	{
+		name="parallel region execute 13744";
+		# change number of threads before entering the region
+		dvfs_freq_before = 2201000;
+		# change number of threads after exiting the region
+#		dvfs_freq_after = 1800000;
+#		file_0:
+#		{
+#			name="13744";
+#			before="1";
+#		}
+	};
+	function_1:
+	{
+		name="parallel region execute 59504";
+		# change number of threads before entering the region
+		dvfs_freq_before = 2201000;
+		# change number of threads after exiting the region
+#		dvfs_freq_after = 1800000;
+#		file_0:
+#		{
+#			name="59504";
+#			before="1";
+#		}
+	};
+};
+
