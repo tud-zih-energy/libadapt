@@ -13,7 +13,7 @@
 #include "adapt.h"
 #include "adapt_internal.h"
 
-//#define VERBOSE 1
+// #define VERBOSE 1
 
 
 /* relates dynamic region id (rid) passed from instrumentation framework
@@ -239,17 +239,17 @@ struct crid_to_config_struct * get_crid2config(uint64_t binary_id,uint64_t crid)
  * @param binary_id the id of a binary retrieved with adapt_add_binary
  * @param rid the variable region id
  * @param the constant region id
- * @return 0 if there is no adaption definition or the binary id is not available or the region id is already registered<br>
+ * @return 1 if there is no adaption definition or the binary id is not available or the region id is already registered<br>
  * 1 if the region has been added
  */
 int add_rid2crid(uint64_t binary_id,uint32_t rid,uint64_t crid){
   /* exists config? */
   struct crid_to_config_struct * c2d =get_crid2config(binary_id,crid);
   struct rid_to_crid_struct * current;
-  if (c2d==NULL) return 0;
+  if (c2d==NULL) return 1;
   current=&r2c_hashmap[rid%hash_set_size];
   while (current->next){
-    if ((current->binary_id==binary_id)&&(current->rid==rid)) return 0;
+    if ((current->binary_id==binary_id)&&(current->rid==rid)) return 1;
     current=current->next;
   }
   if (current->initialized){
@@ -259,7 +259,7 @@ int add_rid2crid(uint64_t binary_id,uint32_t rid,uint64_t crid){
   current->rid=rid;
   memcpy(&(current->crid),c2d,sizeof(struct crid_to_config_struct));
   current->next=NULL;
-  return 1;
+  return 0;
 }
 /* get rid_to_crid */
 struct rid_to_crid_struct * get_rid2crid(uint64_t binary_id,uint32_t rid){
