@@ -208,6 +208,7 @@ int csl_process_after(void * vp, int32_t cpu){
   if (info->csl_after >= 0) {
 #ifdef VERBOSE
     fprintf(stderr,"changing maximal cstate to %d\n",info->csl_after);
+#endif
     ok |= set_max_cstate(cpu,info->csl_after);
   }
 

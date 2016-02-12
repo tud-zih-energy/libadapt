@@ -86,7 +86,7 @@ static uint32_t max_threads=256;
 static uint32_t hash_set_size=101;
 static uint32_t max_function_stack=256;
 
-static FILE * error_stream =stderr;
+static FILE * error_stream;
 
 /*-----------------------------------------------------------------------------
  MurmurHash2, 64-bit versions, by Austin Appleby
@@ -311,6 +311,8 @@ int adapt_open(){
   char buffer[1024];
   config_setting_t *setting = NULL;
   int set_default=0,set_init=0;
+
+  error_stream=stderr;
 
   /* open config */
   file_name = getenv("ADAPT_CONFIG_FILE");
@@ -573,7 +575,7 @@ int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cp
       if (ok)
         return ADAPT_OK;
       else
-        return ADAPT_ERROR_WHILE_ADAPT
+        return ADAPT_ERROR_WHILE_ADAPT;
     } else
       return ADAPT_NO_ACTUAL_ADAPT;
   }
@@ -628,7 +630,7 @@ int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cp
   if (ok)
     return ADAPT_OK;
   else
-    return ADAPT_ERROR_WHILE_ADAPT
+    return ADAPT_ERROR_WHILE_ADAPT;
 }
 
 /**
@@ -657,7 +659,7 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu){
       if (ok)
         return ADAPT_OK;
       else
-        return ADAPT_ERROR_WHILE_ADAPT
+        return ADAPT_ERROR_WHILE_ADAPT;
     }
     else
       return ADAPT_NO_ACTUAL_ADAPT;
@@ -700,8 +702,7 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu){
   if (ok)
     return ADAPT_OK;
   else
-    return ADAPT_ERROR_WHILE_ADAPT
-
+    return ADAPT_ERROR_WHILE_ADAPT;
 }
 
 int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
@@ -742,7 +743,7 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
     if (ok)
       return ADAPT_OK;
     else
-      return ADAPT_ERROR_WHILE_ADAPT
+      return ADAPT_ERROR_WHILE_ADAPT;
   }
   /* only if region is on stack */
   if ((function_stack_sizes[tid]-1)<max_function_stack){
@@ -778,8 +779,7 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
   if (ok)
     return ADAPT_OK;
   else
-    return ADAPT_ERROR_WHILE_ADAPT
-
+    return ADAPT_ERROR_WHILE_ADAPT;
 }
 
 void adapt_close(){
