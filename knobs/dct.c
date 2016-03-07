@@ -5,15 +5,12 @@
  *      Author: rschoene
  */
 
-/*#define VERBOSE 1 */
-
-// #define VERBOSE 1
-
 #include "dct.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <dlfcn.h>
 
+/*#define VERBOSE 1 */
 
 static int dct_enabled=0;
 static int last_set_threads = 0;

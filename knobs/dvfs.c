@@ -18,10 +18,9 @@
 #include <string.h>
 #include <errno.h>
 
+/*#define VERBOSE 1 */
+
 static unsigned int num_cpus = 0;
-
-/* #define VERBOSE 1 */
-
 
 static struct cpufreq_policy ** saved_policies = NULL;
 

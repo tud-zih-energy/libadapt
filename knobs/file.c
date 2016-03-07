@@ -14,9 +14,10 @@ int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char *
   int was_set=0;
   struct file_information * info=vp;
   config_setting_t *setting;
-  /* Resetting */
+  /* Resetting Memory */
   memset(info,0,sizeof(struct file_information));
 
+  /* TODO: Find better way to parse all the file container */
   for (i=0;i<32000;i++){
 
     /* we need the name of the file */
@@ -25,6 +26,8 @@ int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char *
 
     if (setting) {
       /* another setting :) */
+      /* make an "array" with all the filenames and the string that should
+       * be wrtitten to the files */
       info->filename=realloc(info->filename,(i+1)*sizeof(char*));
       info->fd=realloc(info->fd,(i+1)*sizeof(int));
       info->value_before=realloc(info->value_before,(i+1)*sizeof(char*));
@@ -36,9 +39,10 @@ int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char *
 
       /* get the settings */
       info->filename[i]=strdup(config_setting_get_string(setting));
+      /* open file for later write */
       info->fd[i]=open(info->filename[i],O_CREAT | O_WRONLY | O_APPEND,S_IRUSR| S_IWUSR);
 
-
+      /* string to write in file before */
       sprintf(buffer, "%s.%s_%d.before", prefix, FILE_CONFIG_STRING,i);
       setting = config_lookup(cfg, buffer);
 
@@ -50,6 +54,7 @@ int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char *
       else
         info->value_before[i]=NULL;
 
+      /* string to write in file after */
       sprintf(buffer, "%s.%s_%d.after", prefix, FILE_CONFIG_STRING,i);
       setting = config_lookup(cfg, buffer);
 
@@ -65,20 +70,18 @@ int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char *
       break;
 
   }
+  /* retrun if there was set any file writings */
   return was_set;
 }
 
 int file_process_before(void * vp, int ignored){
   int i;
-  int ret;
   struct file_information * info=vp;
   if (info->value_before==NULL) return 0;
 
   for (i=0;i<info->nr_files;i++){
     if (info->value_before[i]!=NULL){
-      ret=write(info->fd[i],info->value_before[i],info->value_before_len[i]);
-      if (ret!=info->value_before_len[i])
-      {
+      if(write(info->fd[i],info->value_before[i],info->value_before_len[i]) != info->value_before_len[i]) {
         return 1;
       }
     }
@@ -93,7 +96,7 @@ int file_process_after(void * vp, int ignored){
 
   for (i=0;i<info->nr_files;i++){
     if (info->value_after[i]!=NULL){
-      if (write(info->fd[i],info->value_after[i],info->value_after_len[i])!=info->value_after_len[i])
+      if (write(info->fd[i],info->value_after[i],info->value_after_len[i]) != info->value_after_len[i])
         return 1;
     }
   }
