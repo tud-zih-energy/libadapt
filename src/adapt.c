@@ -440,7 +440,7 @@ uint64_t adapt_add_binary(char * binary_name){
       if (regex_match(binary_name_in_cfg, binary_name)) {
         break;
       }
-    } else /* not found */{
+    } else /* Not Found, break polite out of the function */ {
 
 #ifdef VERBOSE
       fprintf(error_stream,"ending after %d checks for binary information blubb %s\n",binary_id_in_cfg_file,binary_name);
@@ -496,7 +496,7 @@ uint64_t adapt_add_binary(char * binary_name){
         set_binary_id_used(binary_id,1);
       }
     }
-    else /* not found. end of functions */
+    else /* Not Found, break out of the loop. */
     {
 
 #ifdef VERBOSE
@@ -537,6 +537,13 @@ static int supress_max_thread_count_error = 0;
 /**
  * Use this if you have enter AND exit handling
  */
+
+#define IF_ADAPT \
+    if (ok) \
+        return ADAPT_OK; \
+    else \
+        return ADAPT_ERROR_WHILE_ADAPT;
+
 int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu){
   int knob_index;
   int ok=0;
@@ -572,10 +579,8 @@ int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cp
         if (knobs[knob_index].process_before)
           ok |= knobs[knob_index].process_before(&(default_infos[knob_offsets[knob_index]]),cpu);
       }
-      if (ok)
-        return ADAPT_OK;
-      else
-        return ADAPT_ERROR_WHILE_ADAPT;
+
+      IF_ADAPT;
     } else
       return ADAPT_NO_ACTUAL_ADAPT;
   }
@@ -627,10 +632,7 @@ int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cp
   }
   function_stack_sizes[tid]++;
 
-  if (ok)
-    return ADAPT_OK;
-  else
-    return ADAPT_ERROR_WHILE_ADAPT;
+  IF_ADAPT;
 }
 
 /**
@@ -656,10 +658,8 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu){
         if (knobs[knob_index].process_before)
           ok |= knobs[knob_index].process_before(&(default_infos[knob_offsets[knob_index]]),cpu);
       }
-      if (ok)
-        return ADAPT_OK;
-      else
-        return ADAPT_ERROR_WHILE_ADAPT;
+
+      IF_ADAPT;
     }
     else
       return ADAPT_NO_ACTUAL_ADAPT;
@@ -699,10 +699,7 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu){
     }
   }
 
-  if (ok)
-    return ADAPT_OK;
-  else
-    return ADAPT_ERROR_WHILE_ADAPT;
+  IF_ADAPT;
 }
 
 int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
@@ -740,10 +737,7 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
           ok |= knobs[knob_index].process_after(&(default_infos[knob_offsets[knob_index]]),cpu);
       }
 
-    if (ok)
-      return ADAPT_OK;
-    else
-      return ADAPT_ERROR_WHILE_ADAPT;
+      IF_ADAPT;
   }
   /* only if region is on stack */
   if ((function_stack_sizes[tid]-1)<max_function_stack){
@@ -776,11 +770,19 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
   /* decrease stack size */
   function_stack_sizes[tid]--;
 
-  if (ok)
-    return ADAPT_OK;
-  else
-    return ADAPT_ERROR_WHILE_ADAPT;
+  IF_ADAPT;
 }
+
+#define FREE_LIST \
+    if (current->next){ \
+        current=current->next; \
+        while(current->next){ \
+            next=current->next; \
+            free(current); \
+            current=next; \
+        } \
+    free(current); \
+    }
 
 void adapt_close(){
   int knob_index;
@@ -807,41 +809,17 @@ void adapt_close(){
     if ((&c2conf_hashmap[i])!=NULL){
       struct crid_to_config_struct * current=&c2conf_hashmap[i];
       struct crid_to_config_struct * next;
-      if (current->next){
-        current=current->next;
-        while(current->next){
-          next=current->next;
-          free(current);
-          current=next;
-        }
-        free(current);
-      }
+      FREE_LIST;
     }
     if ((&r2c_hashmap[i])!=NULL){
       struct rid_to_crid_struct * current=&r2c_hashmap[i];
       struct rid_to_crid_struct * next;
-      if (current->next){
-        current=current->next;
-        while(current->next){
-          next=current->next;
-          free(current);
-          current=next;
-        }
-        free(current);
-      }
+      FREE_LIST;
     }
     if ((&bids_hashmap[i])!=NULL){
       struct added_binary_ids_struct * current=&bids_hashmap[i];
       struct added_binary_ids_struct * next;
-      if (current->next){
-        current=current->next;
-        while(current->next){
-          next=current->next;
-          free(current);
-          current=next;
-        }
-        free(current);
-      }
+      FREE_LIST;
     }
   }
   free(c2conf_hashmap);
