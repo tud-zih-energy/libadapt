@@ -50,7 +50,9 @@ set(CMAKE_C_FLAGS_DEBUG "-O0 -g -std=c99")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -std=c99")
 
 #shared c flags among build types
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=c99 -D_POSIX_C_SOURCE -D_BSD_SOURCE -D_GNU_SOURCE")
+#define _DEFAULT_SOURCE when defining _BSD_SOURCE to avoid compiler
+#warnings for glibc later than 2.20
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=c99 -D_POSIX_C_SOURCE -D_BSD_SOURCE -D_DEFAULT_SOURCE -D_GNU_SOURCE")
 
 #add all .c files
 unset(SOURCES CACHE)
