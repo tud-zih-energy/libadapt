@@ -61,7 +61,7 @@ int csl_init(void) {
       return ENOMEM;
     }
 
-    /* get array with all possibke states */
+    /* get array with all possibile states */
     int number_cpuidle_files = scandir(path_string, &namelist, NULL, alphasort);
     /* scandir return -1 if someting went wrong */
     if (number_cpuidle_files <= 0)
