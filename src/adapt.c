@@ -392,11 +392,9 @@ int adapt_open(){
     if (knobs[knob_index].read_from_config)
     {
       set_default |= knobs[knob_index].read_from_config(&(default_infos[knob_offsets[knob_index]]),&cfg,buffer,prefix_default);
-    }
 
-    if (knobs[knob_index].read_from_config)
-    {
       set_init = knobs[knob_index].read_from_config(&(init_infos[knob_offsets[knob_index]]),&cfg,buffer,prefix_init);
+
       if (set_init)
       {
         if (knobs[knob_index].process_before)
@@ -404,12 +402,12 @@ int adapt_open(){
       }
     }
   }
+
   if (!set_default)
   {
     free(default_infos);
     default_infos=NULL;
   }
-
 
   return 0;
 }
@@ -429,18 +427,26 @@ uint64_t adapt_add_binary(char * binary_name){
   if (exists_binary_id(binary_id)) return binary_id;
   bid_struct=add_binary_id(binary_id);
 
+  /* look if binary_name  exists*/
   for (binary_id_in_cfg_file = 0; binary_id_in_cfg_file < 32000; binary_id_in_cfg_file++) {
     sprintf(buffer, "binary_%d.name", binary_id_in_cfg_file);
     setting = config_lookup(&cfg, buffer);
     if (setting) {
+      /* getting name */
       binary_name_in_cfg = config_setting_get_string(setting);
+      /* break if the strings are equal */
       if (strcmp(binary_name, binary_name_in_cfg) == 0) {
         break;
       }
+      /* maybe the given name is part of a regular expression in the
+      * config because we allow regular expressions */
       if (regex_match(binary_name_in_cfg, binary_name)) {
         break;
       }
-    } else /* Not Found, break polite out of the function */ {
+    } else {
+    /* Not Found, break polite out of the function 
+     * because the setting not exist and in the previous settings were
+     * no matching binary name */
 
 #ifdef VERBOSE
       fprintf(error_stream,"ending after %d checks for binary information blubb %s\n",binary_id_in_cfg_file,binary_name);
@@ -449,7 +455,11 @@ uint64_t adapt_add_binary(char * binary_name){
       return 0;
     }
   }
-  /* get defaults */
+
+  /* binary_id_in_cfg_file has now the fitting value for the binary_name
+   * */
+
+  /* get defaults from the config */
   sprintf(prefix, "binary_%d", binary_id_in_cfg_file);
   for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
   {
@@ -460,11 +470,12 @@ uint64_t adapt_add_binary(char * binary_name){
 #ifdef VERBOSE
       fprintf(error_stream,"binary %s %llu %llu provides default values %d\n",binary_name,binary_id,get_binary_id(binary_name),is_binary_id_used(binary_id));
 #endif
+    /* mark binary_id as used if there any setting */
     set_binary_id_used(binary_id,1);
   }
 
-  /* find functions and register */
-
+  /* Read Configuration for function in config structure and register it
+   * with the binary_id */
   for (function_id_in_cfg_file = 0; function_id_in_cfg_file < 32000; function_id_in_cfg_file++) {
     sprintf(buffer, "binary_%d.function_%d.name", binary_id_in_cfg_file, function_id_in_cfg_file);
     setting = config_lookup(&cfg, buffer);
@@ -480,19 +491,22 @@ uint64_t adapt_add_binary(char * binary_name){
       tmp_crid_to_config_struct.infos=calloc(1,adapt_information_size);
 
       crid=MurmurHash64A(function_name_in_cfg,strlen(function_name_in_cfg),0);
-      /* normal function */
+
 #ifdef VERBOSE
       fprintf(error_stream,"Function definition:%s/%s %s %lu %lu %llu\n",binary_name_in_cfg,binary_name,function_name_in_cfg,binary_id_in_cfg_file, function_id_in_cfg_file,crid);
 #endif
+
       for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
       {
         if ( knobs[knob_index].read_from_config )
           set |= knobs[knob_index].read_from_config(&(tmp_crid_to_config_struct.infos[knob_offsets[knob_index]]),&cfg,buffer,prefix);
       }
+      
       if (set)
       {
         /* register in hashmap */
         add_crid2config(binary_id,crid,&tmp_crid_to_config_struct);
+        /* makr binary as used if there any function according to it */
         set_binary_id_used(binary_id,1);
       }
     }
@@ -602,9 +616,7 @@ int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cp
 #endif
     /* get the constant region id */
     struct rid_to_crid_struct * r2d=get_rid2crid(binary_id,rid);
-#ifdef VERBOSE
-    int i;
-#endif
+
     /* if there is something to change */
     if (r2d != NULL){
 #ifdef VERBOSE
@@ -669,10 +681,8 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu){
 #endif
   /* get constant region ID */
   struct rid_to_crid_struct * r2d=get_rid2crid(binary_id,rid);
-#ifdef VERBOSE
-    int i;
-#endif
-    /* any adaption for region defined? */
+
+  /* any adaption for region defined? */
   if (r2d != NULL){
 #ifdef VERBOSE
     fprintf(error_stream,"Crid %lu %llu\n",r2d->rid,r2d->crid);
