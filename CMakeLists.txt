@@ -18,6 +18,11 @@ project(adapt)
 # Disable x86 adapt kernel module interaction
 # -DNO_X86_ADAPT=On
 
+# Set a default build type if none was specified
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "Setting build type to 'Release' as none was specified.")
+   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+endif()
 
 # You may give this option ...
 option(CFG_DIR "Path to include/libconfig.h and lib/libconfig.so")
