@@ -16,6 +16,58 @@
 // #define VERBOSE 1
 
 
+/* Check if the given value is zero or not and return the
+ * correspondeding ADAPT_STATUS 
+ * */
+#define RETURN_ADAPT_STATUS(int) \
+    if (int) \
+        return ADAPT_OK; \
+    else \
+        return ADAPT_ERROR_WHILE_ADAPT;
+
+/* Free and set the given pointer to NULL 
+ * */
+#define FREE_AND_NULL(a) {\
+        free(a);\
+        a = NULL;\
+}
+
+/* Check pointer and then free it
+ * */
+#define CHECK_INIT_MALLOC_FREE(a) if(a)\
+    FREE_AND_NULL(a)
+
+/* unsusable stuff in the case that not enough memory is avaible 
+ * */
+#define CHECK_INIT_MALLOC(a) if( (a) == NULL) { \
+    config_destroy(&cfg); \
+    CHECK_INIT_MALLOC_FREE(c2conf_hashmap); \
+    CHECK_INIT_MALLOC_FREE(r2c_hashmap); \
+    CHECK_INIT_MALLOC_FREE(bids_hashmap); \
+    CHECK_INIT_MALLOC_FREE(function_stacks); \
+    CHECK_INIT_MALLOC_FREE(function_stack_sizes); \
+    CHECK_INIT_MALLOC_FREE(default_infos); \
+    CHECK_INIT_MALLOC_FREE(init_infos); \
+    CHECK_INIT_MALLOC_FREE(knob_offsets); \
+    return ENOMEM; \
+}
+
+
+/* Free a list
+ * static function would be nicer but is not possible for different
+ * structures 
+ * */
+#define FREE_LIST \
+    if (current->next){ \
+        current=current->next; \
+        while(current->next){ \
+            next=current->next; \
+            FREE_AND_NULL(current); \
+            current=next; \
+        } \
+        FREE_AND_NULL(current); \
+    }
+
 /* relates dynamic region id (rid) passed from instrumentation framework
  * to libadapt to a constant region id (crid) computed from the hash of
  * the region name. */
@@ -42,7 +94,6 @@ struct crid_to_config_struct{
 /* This struct is used to allow multi binary support.
  * If you monitor a system for example that allows the concurrent execution
  * of different tasks, you create such a struct for each task
- *
  * */
 struct added_binary_ids_struct{
   uint64_t binary_id;
@@ -50,6 +101,11 @@ struct added_binary_ids_struct{
   char * default_infos;
   struct added_binary_ids_struct * next;
 };
+
+/* These are the global configurations from the config file  used in adapt_open and
+ * adapt_add_binary
+ * */
+static struct config_t cfg;
 
 /*
  * These (default_*_infos) are the defaults that are set whenever the binary
@@ -287,23 +343,6 @@ static int regex_match(const char *pattern, char *string) {
   return (1);
 }
 
-static struct config_t cfg;
-
-#define CHECK_INIT_MALLOC_FREE(a) if (a) free(a)
-
-#define CHECK_INIT_MALLOC(a) if( (a) == NULL) { \
-    config_destroy(&cfg); \
-    CHECK_INIT_MALLOC_FREE(c2conf_hashmap); \
-    CHECK_INIT_MALLOC_FREE(r2c_hashmap); \
-    CHECK_INIT_MALLOC_FREE(bids_hashmap); \
-    CHECK_INIT_MALLOC_FREE(function_stacks); \
-    CHECK_INIT_MALLOC_FREE(function_stack_sizes); \
-    CHECK_INIT_MALLOC_FREE(default_infos); \
-    CHECK_INIT_MALLOC_FREE(init_infos); \
-    CHECK_INIT_MALLOC_FREE(knob_offsets); \
-    return ENOMEM; \
-}
-
 int adapt_open(){
   char *file_name;
   char * prefix_default="default";
@@ -405,8 +444,7 @@ int adapt_open(){
 
   if (!set_default)
   {
-    free(default_infos);
-    default_infos=NULL;
+    FREE_AND_NULL(default_infos);
   }
 
   return 0;
@@ -522,8 +560,6 @@ uint64_t adapt_add_binary(char * binary_name){
   return binary_id;
 }
 
-
-
 int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid){
   uint64_t crid;
   if (function_stacks==NULL) return 1;
@@ -551,12 +587,6 @@ static int supress_max_thread_count_error = 0;
 /**
  * Use this if you have enter AND exit handling
  */
-
-#define IF_ADAPT \
-    if (ok) \
-        return ADAPT_OK; \
-    else \
-        return ADAPT_ERROR_WHILE_ADAPT;
 
 int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu){
   int knob_index;
@@ -594,7 +624,7 @@ int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cp
           ok |= knobs[knob_index].process_before(&(default_infos[knob_offsets[knob_index]]),cpu);
       }
 
-      IF_ADAPT;
+      RETURN_ADAPT_STATUS(ok);
     } else
       return ADAPT_NO_ACTUAL_ADAPT;
   }
@@ -644,7 +674,7 @@ int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cp
   }
   function_stack_sizes[tid]++;
 
-  IF_ADAPT;
+  RETURN_ADAPT_STATUS(ok);
 }
 
 /**
@@ -671,7 +701,7 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu){
           ok |= knobs[knob_index].process_before(&(default_infos[knob_offsets[knob_index]]),cpu);
       }
 
-      IF_ADAPT;
+      RETURN_ADAPT_STATUS(ok);
     }
     else
       return ADAPT_NO_ACTUAL_ADAPT;
@@ -709,7 +739,7 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu){
     }
   }
 
-  IF_ADAPT;
+  RETURN_ADAPT_STATUS(ok);
 }
 
 int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
@@ -747,7 +777,7 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
           ok |= knobs[knob_index].process_after(&(default_infos[knob_offsets[knob_index]]),cpu);
       }
 
-      IF_ADAPT;
+      RETURN_ADAPT_STATUS(ok);
   }
   /* only if region is on stack */
   if ((function_stack_sizes[tid]-1)<max_function_stack){
@@ -780,19 +810,8 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
   /* decrease stack size */
   function_stack_sizes[tid]--;
 
-  IF_ADAPT;
+  RETURN_ADAPT_STATUS(ok);
 }
-
-#define FREE_LIST \
-    if (current->next){ \
-        current=current->next; \
-        while(current->next){ \
-            next=current->next; \
-            free(current); \
-            current=next; \
-        } \
-    free(current); \
-    }
 
 void adapt_close(){
   int knob_index;
@@ -802,10 +821,10 @@ void adapt_close(){
   function_stacks=NULL;
   int i;
   for (i=0;i<max_function_stack;i++){
-    free(tmp[i]);
+    FREE_AND_NULL(tmp[i]);
   }
-  free(tmp);
-  free(function_stack_sizes);
+  FREE_AND_NULL(tmp);
+  FREE_AND_NULL(function_stack_sizes);
 
   /* init infos? */
   if ( init_infos )
@@ -832,9 +851,9 @@ void adapt_close(){
       FREE_LIST;
     }
   }
-  free(c2conf_hashmap);
-  free(r2c_hashmap);
-  free(bids_hashmap);
+  FREE_AND_NULL(c2conf_hashmap);
+  FREE_AND_NULL(r2c_hashmap);
+  FREE_AND_NULL(bids_hashmap);
 
   for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
   {
@@ -842,3 +861,4 @@ void adapt_close(){
       knobs[knob_index].fini();
   }
 }
+
