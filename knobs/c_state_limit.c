@@ -83,15 +83,11 @@ int csl_init(void) {
     /* get array with all possibile states */
     int number_cpuidle_files = scandir(path_string, &namelist, NULL, alphasort);
     /* scandir return -1 if someting went wrong */
-    if (number_cpuidle_files <= 0)
+    /* namelist shouldn't be a NULL Pointer */
+    if (number_cpuidle_files <= 0 && namelist)
     {
       free(per_cpu_cstates);
       return EPERM;
-    }
-    /* namelist shouldn't be a NULL Pointer */
-    if (namelist) {
-        free(per_cpu_cstates);
-        return EPERM;
     }
 
     for (cpuidle_file=0;cpuidle_file<number_cpuidle_files;cpuidle_file++){
