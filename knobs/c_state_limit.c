@@ -99,6 +99,10 @@ int csl_init(void) {
         /* allocate space for state information*/
         if (per_cpu_cstates[current_cpu].nr_cstates < (state_id + 1)){
           per_cpu_cstates[current_cpu].c_state_files=realloc(per_cpu_cstates[current_cpu].c_state_files,(state_id+1)*sizeof(struct c_state_file));
+          if (per_cpu_cstates[current_cpu].c_state_files == NULL)
+              /* not enough space for an integer?
+               * so we schould break here */
+              return ENOMEM;
           per_cpu_cstates[current_cpu].nr_cstates=state_id;
         }
 

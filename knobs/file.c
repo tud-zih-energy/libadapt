@@ -27,6 +27,17 @@
 
 #include <string.h>
 
+/* if realloc fail something is particular fail 
+ * but we're going on and process the settings there fit in the memory
+ * */
+#define BREAK_REALLOC_FAIL(ptr,size) \
+    tmp = realloc(ptr,size); \
+    if (tmp == NULL) \
+        break; \
+    else \
+        ptr = tmp; \
+    tmp = NULL;
+
 int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char * prefix){
 
   int i;
@@ -47,12 +58,15 @@ int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char *
       /* another setting :) */
       /* make an "array" with all the filenames and the string that should
        * be wrtitten to the files */
-      info->filename=realloc(info->filename,(i+1)*sizeof(char*));
-      info->fd=realloc(info->fd,(i+1)*sizeof(int));
-      info->value_before=realloc(info->value_before,(i+1)*sizeof(char*));
-      info->value_before_len=realloc(info->value_before_len,(i+1)*sizeof(size_t));
-      info->value_after=realloc(info->value_after,(i+1)*sizeof(char*));
-      info->value_after_len=realloc(info->value_after_len,(i+1)*sizeof(size_t));
+      /* temporary void pointer for the macro
+       * realloc gives us a void pointer back, so there is no problem*/
+      void *tmp;
+      BREAK_REALLOC_FAIL(info->filename,(i+1)*sizeof(char*));
+      BREAK_REALLOC_FAIL(info->fd,(i+1)*sizeof(int));
+      BREAK_REALLOC_FAIL(info->value_before,(i+1)*sizeof(char*));
+      BREAK_REALLOC_FAIL(info->value_before_len,(i+1)*sizeof(size_t));
+      BREAK_REALLOC_FAIL(info->value_after,(i+1)*sizeof(char*));
+      BREAK_REALLOC_FAIL(info->value_after_len,(i+1)*sizeof(size_t));
       info->nr_files=i+1;
 
 
