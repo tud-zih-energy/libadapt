@@ -56,13 +56,13 @@ int csl_init(void) {
   /* get number of CPUs */
   num_cpus = sysconf(_SC_NPROCESSORS_CONF);
 
-  per_cpu_cstates=malloc(num_cpus*sizeof(struct per_cpu));
+  /* calloc is a lot faster than malloc + memset */
+  per_cpu_cstates = calloc(num_cpus, sizeof(struct per_cpu));
   /* alloc ok? */
-  if (per_cpu_cstates==NULL)
+  if (per_cpu_cstates == NULL)
   {
     return ENOMEM;
   }
-  memset(per_cpu_cstates,0,sizeof(struct per_cpu));
 
   nr_per_cpu_cstates=num_cpus;
 

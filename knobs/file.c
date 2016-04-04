@@ -41,14 +41,14 @@
 int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char * prefix){
 
   int i;
-  int was_set=0;
-  struct file_information * info=vp;
+  int was_set = 0;
+  struct file_information * info = vp;
   config_setting_t *setting;
   /* Resetting Memory */
   memset(info,0,sizeof(struct file_information));
 
-  /* TODO: Find better way to parse all the file container */
   for (i=0;i<32000;i++){
+    /* TODO: Find better way to parse all the file container */
 
     /* we need the name of the file */
     sprintf(buffer, "%s.%s_%d.name", prefix, FILE_CONFIG_STRING,i);
