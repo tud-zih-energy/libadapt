@@ -76,17 +76,17 @@
  * static function would be nicer but is not possible for different
  * structures 
  * */
-#define FREE_LIST \
-    if (current->next){ \
-        next = current; \
-        current=current->next; \
-        FREE_AND_NULL(next);\
-        while(current->next){ \
-            next=current->next; \
-            FREE_AND_NULL(current); \
-            current=next; \
+#define FREE_LIST(current_ptr, next_ptr) \
+    if (current_ptr->next){ \
+        next_ptr = current_ptr; \
+        current_ptr = current->next; \
+        FREE_AND_NULL(next_ptr);\
+        while(current_ptr->next){ \
+            next_ptr = current_ptr->next; \
+            FREE_AND_NULL(current_ptr); \
+            current_ptr = next_ptr; \
         } \
-        FREE_AND_NULL(current); \
+        FREE_AND_NULL(current_ptr); \
     }
 
 /* relates dynamic region id (rid) passed from instrumentation framework
@@ -122,6 +122,10 @@ struct added_binary_ids_struct{
   char * default_infos;
   struct added_binary_ids_struct * next;
 };
+
+/* These are the global error count to supress more than one error
+ * message about the maximum number of threas */
+static int supress_max_thread_count_error = 0;
 
 /* These are the global configurations from the config file  used in adapt_open and
  * adapt_add_binary
@@ -584,9 +588,8 @@ uint64_t adapt_add_binary(char * binary_name){
 int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid){
   uint64_t crid;
   if (function_stacks==NULL) return 1;
-  if (!is_binary_id_used(binary_id)){
-    return 1;
-  }
+  if (!is_binary_id_used(binary_id)) return 1;
+
   /* if it is not already registered */
   if (get_rid2crid(binary_id, rid)==NULL)
   {
@@ -603,12 +606,9 @@ int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid){
   return 1;
 }
 
-static int supress_max_thread_count_error = 0;
-
 /**
  * Use this if you have enter AND exit handling
  */
-
 int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu){
     return adapt_enter_opt_stacks(binary_id, tid, rid, cpu, 1);
 }
@@ -623,7 +623,6 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu){
 /**
  * Use this for both with optional stack switch
  */
-
 int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int exit_on) {
   int knob_index;
   int ok=0;
@@ -637,7 +636,7 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
     return ADAPT_NOT_INITITALIZED;
   }
 
-  if(exit_on) {
+  if (exit_on) {
     if (tid >= max_threads) {
         if (!supress_max_thread_count_error) {
         supress_max_thread_count_error = 1;
@@ -669,12 +668,12 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
   /* unfortunately the dct exit does not work on all compilers, so we repeat it here :( */
 #ifndef NO_DCT
   {
-      if(exit_on)
+      if (exit_on)
           omp_dct_repeat_exit();
   }
 #endif
 
-  if(exit_on) {
+  if (exit_on) {
     /* add to stack / stack to large? */
     if (function_stacks[tid] == NULL)
         function_stacks[tid] = calloc(max_function_stack,sizeof(uint32_t));
@@ -714,7 +713,7 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
             fprintf(error_stream,"Enter binary default\n");
 #endif
             /* get struct for defaults */
-            struct added_binary_ids_struct * bid= get_bid(binary_id);
+            struct added_binary_ids_struct * bid = get_bid(binary_id);
 
             /* apply default settings for binary */
             for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
@@ -829,17 +828,17 @@ void adapt_close(){
     if ((&c2conf_hashmap[i])!=NULL){
       struct crid_to_config_struct * current=&c2conf_hashmap[i];
       struct crid_to_config_struct * next;
-      FREE_LIST;
+      FREE_LIST(current, next);
     }
     if ((&r2c_hashmap[i])!=NULL){
       struct rid_to_crid_struct * current=&r2c_hashmap[i];
       struct rid_to_crid_struct * next;
-      FREE_LIST;
+      FREE_LIST(current, next);
     }
     if ((&bids_hashmap[i])!=NULL){
       struct added_binary_ids_struct * current=&bids_hashmap[i];
       struct added_binary_ids_struct * next;
-      FREE_LIST;
+      FREE_LIST(current, next);
     }
   }
   FREE_AND_NULL(c2conf_hashmap);
