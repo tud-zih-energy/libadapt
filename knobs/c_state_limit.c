@@ -84,8 +84,9 @@ int csl_init(void) {
     int number_cpuidle_files = scandir(path_string, &namelist, NULL, alphasort);
     /* scandir return -1 if someting went wrong */
     /* namelist shouldn't be a NULL Pointer */
-    if (number_cpuidle_files <= 0 && namelist)
+    if (number_cpuidle_files <= 0 && namelist == NULL)
     {
+      /* if we are here something went wrong */
       free(per_cpu_cstates);
       return EPERM;
     }
