@@ -76,10 +76,10 @@
  * static function would be nicer but is not possible for different
  * structures 
  * */
-#define FREE_LIST(current_ptr, next_ptr) \
+#define FREE_LIST(current_ptr) \
     if (current_ptr->next){ \
-        next_ptr = current_ptr; \
-        current_ptr = current->next; \
+        __auto_type next_ptr = current_ptr; \
+        current_ptr = current_ptr->next; \
         FREE_AND_NULL(next_ptr);\
         while(current_ptr->next){ \
             next_ptr = current_ptr->next; \
@@ -827,18 +827,15 @@ void adapt_close(){
   for (i=0;i<hash_set_size;i++){
     if ((&c2conf_hashmap[i])!=NULL){
       struct crid_to_config_struct * current=&c2conf_hashmap[i];
-      struct crid_to_config_struct * next;
-      FREE_LIST(current, next);
+      FREE_LIST(current);
     }
     if ((&r2c_hashmap[i])!=NULL){
       struct rid_to_crid_struct * current=&r2c_hashmap[i];
-      struct rid_to_crid_struct * next;
-      FREE_LIST(current, next);
+      FREE_LIST(current);
     }
     if ((&bids_hashmap[i])!=NULL){
       struct added_binary_ids_struct * current=&bids_hashmap[i];
-      struct added_binary_ids_struct * next;
-      FREE_LIST(current, next);
+      FREE_LIST(current);
     }
   }
   FREE_AND_NULL(c2conf_hashmap);
