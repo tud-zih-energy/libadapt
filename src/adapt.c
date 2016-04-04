@@ -38,8 +38,8 @@
 /* Check if the given value is zero or not and return the
  * correspondeding ADAPT_STATUS 
  * */
-#define RETURN_ADAPT_STATUS(int) \
-    if (int) \
+#define RETURN_ADAPT_STATUS(settings) \
+    if (settings) \
         return ADAPT_OK; \
     else \
         return ADAPT_ERROR_WHILE_ADAPT;
@@ -78,7 +78,9 @@
  * */
 #define FREE_LIST \
     if (current->next){ \
+        next = current; \
         current=current->next; \
+        FREE_AND_NULL(next);\
         while(current->next){ \
             next=current->next; \
             FREE_AND_NULL(current); \
