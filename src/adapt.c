@@ -676,54 +676,60 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
 
   if(exit_on) {
     /* add to stack / stack to large? */
-    if (function_stacks[tid]==NULL)
-        function_stacks[tid]=calloc(max_function_stack,sizeof(uint32_t));
+    if (function_stacks[tid] == NULL)
+        function_stacks[tid] = calloc(max_function_stack,sizeof(uint32_t));
 
     /* check for max stack size */
-    if (function_stack_sizes[tid]<max_function_stack){
-    }
+    /* this should be always executed if we don't use stack
+     * but if we use stacks we need to look for the stack size
+     * */
+    if (!exit_on || function_stack_sizes[tid]<max_function_stack){
 
 #ifdef VERBOSE
-    fprintf(error_stream,"Enter %llu %lu %lu %lu\n",binary_id,tid,function_stack_sizes[tid],rid);
+        if (exit_on)
+            fprintf(error_stream,"Enter %llu %lu %lu %lu\n",binary_id,tid,function_stack_sizes[tid],rid);
+        else
+            fprintf(error_stream,"Enter %lu\n",rid);
 #endif
-    /* get the constant region id */
-    struct rid_to_crid_struct * r2d=get_rid2crid(binary_id,rid);
+        /* get the constant region id */
+        struct rid_to_crid_struct * r2d = get_rid2crid(binary_id,rid);
 
-    /* if there is something to change */
-    /* any adaption for region defined? */
-    if (r2d != NULL){
+        /* if there is something to change */
+        /* any adaption for region defined? */
+        if (r2d != NULL){
 #ifdef VERBOSE
-      fprintf(error_stream,"Crid %lu %llu\n",r2d->rid,r2d->crid);
+            fprintf(error_stream,"Crid %lu %llu\n",r2d->rid,r2d->crid);
 #endif
         
-      /* do adapt */
-      for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
-      {
-        if (knobs[knob_index].process_before)
-          ok |=knobs[knob_index].process_before(&(r2d->infos[knob_offsets[knob_index]]),cpu);
-      }
-    }
-    /* no definition for reason -> use defaults */
-    else {
-#ifdef VERBOSE
-        fprintf(error_stream,"Enter binary default\n");
-#endif
-        /* get struct for defaults */
-        struct added_binary_ids_struct * bid= get_bid(binary_id);
-
-        /* apply default settings for binary */
-        for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
-        {
-            if (knobs[knob_index].process_before)
-                ok |= knobs[knob_index].process_before(&(bid->default_infos[knob_offsets[knob_index]]),cpu);
+            /* do adapt */
+            for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
+            {
+                if (knobs[knob_index].process_before)
+                ok |=knobs[knob_index].process_before(&(r2d->infos[knob_offsets[knob_index]]),cpu);
+            }
         }
-    }
-    if(exit_on)
-        function_stacks[tid][function_stack_sizes[tid]]=rid;
-  }
-  if (exit_on)
-      function_stack_sizes[tid]++;
+        /* no definition for reason -> use defaults */
+        else {
+#ifdef VERBOSE
+            fprintf(error_stream,"Enter binary default\n");
+#endif
+            /* get struct for defaults */
+            struct added_binary_ids_struct * bid= get_bid(binary_id);
 
+            /* apply default settings for binary */
+            for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
+            {
+                if (knobs[knob_index].process_before)
+                    ok |= knobs[knob_index].process_before(&(bid->default_infos[knob_offsets[knob_index]]),cpu);
+            }
+        }
+        if (exit_on)
+            function_stacks[tid][function_stack_sizes[tid]]=rid;
+    }
+    if (exit_on)
+        function_stack_sizes[tid]++;
+
+  }
   RETURN_ADAPT_STATUS(ok);
 }
 
