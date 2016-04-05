@@ -840,6 +840,7 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu)
 void adapt_close()
 {
   int knob_index;
+  int i;
   /* if the work was already done by another thread, we have nothing to do */
   if (!c2conf_hashmap)
     return;
@@ -851,7 +852,6 @@ void adapt_close()
     /* make closing ready for threads
     * for free the function_stack use another pointer */
     function_stacks = NULL;
-    int i;
 
     for (i=0; i < max_function_stack; i++ )
     {
