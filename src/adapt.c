@@ -34,6 +34,17 @@
 
 // #define VERBOSE 1
 
+/* TODO: Reduce SoC in this file
+ * put functions for the binary handling and for the settings handling
+ * in separated files from the adapt realted stuff
+ * to make it more readable
+ * 
+ * separate hashmaps should be a lot easier as the settings
+ * default_infos and init_infos can stay here
+ * so only the hashmaps need to move, that are only used outside of the
+ * adapt functions
+ * */
+
 
 /* Check if the given value is zero or not and return the
  * correspondeding ADAPT_STATUS 
@@ -136,17 +147,17 @@ static struct config_t cfg;
  * These (default_*_infos) are the defaults that are set whenever the binary
  * that is entered / exited is not defined in the config file
  * */
-static char * default_infos=NULL;
+static char * default_infos = NULL;
 
 /*
  * These (init_*_infos) are the initial values that are set when this library is loaded
  * */
-static char * init_infos=NULL;
+static char * init_infos = NULL;
 
 /**
  * these are the offset for the different knob types' information within the infos
  */
-static size_t * knob_offsets=NULL;
+static size_t * knob_offsets = NULL;
 
 /*
  * These are the function stack sizes for different number of threads
@@ -154,19 +165,20 @@ static size_t * knob_offsets=NULL;
  * Otherwise one would have to use the binary number as thread_id, right?
  * */
 
-static uint32_t ** function_stacks=NULL;
-static uint32_t * function_stack_sizes=NULL;
+static uint32_t ** function_stacks = NULL;
+static uint32_t * function_stack_sizes = NULL;
 
 /* maps described in struct definition */
-static struct crid_to_config_struct * c2conf_hashmap=NULL;
-static struct rid_to_crid_struct * r2c_hashmap=NULL;
-static struct added_binary_ids_struct * bids_hashmap=NULL;
+static struct crid_to_config_struct * c2conf_hashmap = NULL;
+static struct rid_to_crid_struct * r2c_hashmap = NULL;
+static struct added_binary_ids_struct * bids_hashmap = NULL;
 
 
-static uint32_t max_threads=256;
-static uint32_t hash_set_size=101;
-static uint32_t max_function_stack=256;
+static uint32_t max_threads = 256;
+static uint32_t hash_set_size = 101;
+static uint32_t max_function_stack = 256;
 
+/* every error message should use the same stream */
 static FILE * error_stream;
 
 /*-----------------------------------------------------------------------------
@@ -376,7 +388,7 @@ int adapt_open(){
   config_setting_t *setting = NULL;
   int set_default=0,set_init=0;
 
-  error_stream=stderr;
+  error_stream = stderr;
 
   /* open config */
   file_name = getenv("ADAPT_CONFIG_FILE");
@@ -423,7 +435,7 @@ int adapt_open(){
   /* create function_stacks */
   CHECK_INIT_MALLOC(function_stacks=calloc(max_threads,sizeof(uint32_t *)));
   CHECK_INIT_MALLOC(function_stack_sizes=calloc(max_threads,sizeof(uint32_t)));
-
+  /* create settings structure */
   CHECK_INIT_MALLOC(default_infos=calloc(1,adapt_information_size));
   CHECK_INIT_MALLOC(init_infos=calloc(1,adapt_information_size));
 
@@ -462,6 +474,7 @@ int adapt_open(){
       if (set_init)
       {
         if (knobs[knob_index].process_before)
+          /* apply setting for initialize for the current cpu */
           knobs[knob_index].process_before(&(init_infos[knob_offsets[knob_index]]),sched_getcpu());
       }
     }
@@ -632,7 +645,7 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
   fprintf(error_stream,"Enter test function stacks\n");
 #endif
 
-  if (function_stacks==NULL)
+  if (function_stacks == NULL)
   {
     fprintf(error_stream,"libadapt: ERROR: function_stacks NULL\n");
     return ADAPT_NOT_INITITALIZED;
@@ -668,7 +681,8 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
       }
 
       RETURN_ADAPT_STATUS(ok);
-    } else
+    }
+    else
         return ADAPT_NO_ACTUAL_ADAPT;
   }
   /* unfortunately the dct exit does not work on all compilers, so we repeat it here :( */
@@ -731,20 +745,27 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
                 ok |= knobs[knob_index].process_before(&(bid->default_infos[knob_offsets[knob_index]]),cpu);
         }
     }
+
     if (exit_on)
-        function_stacks[tid][function_stack_sizes[tid]]=rid;
-  }
-  if (exit_on)
+    {
+        /* save the rgeion id for this thread */
+        function_stacks[tid][function_stack_sizes[tid]] = rid;
+        /* increase stack size immediately afterwards */
         function_stack_sizes[tid]++;
+
+    }
+  }
 
   RETURN_ADAPT_STATUS(ok);
 }
 
-int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
+int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu)
+{
   int knob_index;
   int ok = 0;
 
-  if (function_stacks == NULL) {
+  if (function_stacks == NULL)
+  {
 #ifdef VERBOSE
     fprintf(error_stream,"libadapt: ERROR: function_stacks NULL\n");
 #endif
@@ -781,12 +802,13 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
       RETURN_ADAPT_STATUS(ok);
   }
   /* only if region is on stack */
-  if ((function_stack_sizes[tid]-1)<max_function_stack){
+  if ((function_stack_sizes[tid] - 1) >= 0)
+  {
 #ifdef VERBOSE
-    fprintf(error_stream,"Exit %lu %lu %lu \n",tid,function_stack_sizes[tid],function_stacks[tid][function_stack_sizes[tid]-1]);
+    fprintf(error_stream,"Exit %lu %lu %lu \n",tid,function_stack_sizes[tid],function_stacks[tid][function_stack_sizes[tid] - 1]);
 #endif
     /* get region definition */
-    struct rid_to_crid_struct * r2d=get_rid2crid(binary_id,function_stacks[tid][function_stack_sizes[tid]-1]);
+    struct rid_to_crid_struct * r2d = get_rid2crid(binary_id,function_stacks[tid][function_stack_sizes[tid] - 1]);
 
     /* if there is a region definition */
     if (r2d != NULL)
@@ -800,7 +822,7 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
     }
     else /* if there is no region definition, apply defaults */
     {
-      struct added_binary_ids_struct * bid= get_bid(binary_id);
+      struct added_binary_ids_struct * bid = get_bid(binary_id);
 
       for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
       {
@@ -808,44 +830,60 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu){
           ok |= knobs[knob_index].process_after(&(bid->default_infos[knob_offsets[knob_index]]),cpu);
       }
     }
+    /* decrease stack size */
+    function_stack_sizes[tid]--;
   }
-  /* decrease stack size */
-  function_stack_sizes[tid]--;
 
   RETURN_ADAPT_STATUS(ok);
 }
 
-void adapt_close(){
+void adapt_close()
+{
   int knob_index;
+  /* if the work was already done by another thread, we have nothing to do */
   if (!c2conf_hashmap)
     return;
-  uint32_t ** tmp = function_stacks;
-  function_stacks=NULL;
-  int i;
-  for (i=0;i<max_function_stack;i++){
-    FREE_AND_NULL(tmp[i]);
+
+  /* first look if the work was done by another thread */
+  if (function_stacks != NULL)
+  {
+    uint32_t ** tmp = function_stacks;
+    /* make closing ready for threads
+    * for free the function_stack use another pointer */
+    function_stacks = NULL;
+    int i;
+
+    for (i=0; i < max_function_stack; i++ )
+    {
+        FREE_AND_NULL(tmp[i]);
+    }
+    FREE_AND_NULL(tmp);
+    FREE_AND_NULL(function_stack_sizes);
   }
-  FREE_AND_NULL(tmp);
-  FREE_AND_NULL(function_stack_sizes);
 
   /* init infos? */
   if ( init_infos )
     for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
     {
       if (knobs[knob_index].process_after)
+        /* apply initial setting for current cpu */
         knobs[knob_index].process_after(&(init_infos[knob_offsets[knob_index]]),sched_getcpu());
     }
 
-  for (i=0;i<hash_set_size;i++){
-    if ((&c2conf_hashmap[i])!=NULL){
+  for (i=0; i < hash_set_size; i++ )
+  {
+    if ((&c2conf_hashmap[i]) != NULL)
+    {
       struct crid_to_config_struct * current=&c2conf_hashmap[i];
       FREE_LIST(current);
     }
-    if ((&r2c_hashmap[i])!=NULL){
+    if ((&r2c_hashmap[i]) != NULL)
+    {
       struct rid_to_crid_struct * current=&r2c_hashmap[i];
       FREE_LIST(current);
     }
-    if ((&bids_hashmap[i])!=NULL){
+    if ((&bids_hashmap[i]) != NULL)
+    {
       struct added_binary_ids_struct * current=&bids_hashmap[i];
       FREE_LIST(current);
     }
