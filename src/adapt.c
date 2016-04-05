@@ -235,8 +235,8 @@ uint64_t MurmurHash64A ( const void * key, int len, uint64_t seed )
   return h;
 }
 
-static inline uint64_t get_binary_id(char * binary){
-  return MurmurHash64A(binary,strlen(binary),0);
+static inline uint64_t get_id(const char * name){
+  return MurmurHash64A(name, strlen(name), 0);
 }
 
 struct added_binary_ids_struct * add_binary_id(uint64_t binary_id){
@@ -301,6 +301,8 @@ struct crid_to_config_struct * add_crid2config(uint64_t binary_id,uint64_t crid,
     if ((current->binary_id==binary_id)&&(current->crid==crid)) return current;
     current=current->next;
   }
+  if ((current->binary_id==binary_id)&&(current->crid==crid)) return current;
+
   if (current->initialized){
     current->next=calloc(1,sizeof(struct crid_to_config_struct));
     current=current->next;
@@ -337,7 +339,7 @@ struct crid_to_config_struct * get_crid2config(uint64_t binary_id,uint64_t crid)
  */
 int add_rid2crid(uint64_t binary_id,uint32_t rid,uint64_t crid){
   /* exists config? */
-  struct crid_to_config_struct * c2d =get_crid2config(binary_id,crid);
+  struct crid_to_config_struct * c2d = get_crid2config(binary_id,crid);
   struct rid_to_crid_struct * current;
   if (c2d==NULL) return 1;
   current=&r2c_hashmap[rid%hash_set_size];
@@ -345,6 +347,8 @@ int add_rid2crid(uint64_t binary_id,uint32_t rid,uint64_t crid){
     if ((current->binary_id==binary_id)&&(current->rid==rid)) return 1;
     current=current->next;
   }
+  if ((current->binary_id==binary_id)&&(current->rid==rid)) return 1;
+
   if (current->initialized){
     current->next=calloc(1,sizeof(struct rid_to_crid_struct));
     current=current->next;
@@ -499,7 +503,7 @@ uint64_t adapt_add_binary(char * binary_name){
   const char * binary_name_in_cfg;
   struct added_binary_ids_struct * bid_struct;
   if(function_stacks==NULL) return 0;
-  binary_id=get_binary_id(binary_name);
+  binary_id=get_id(binary_name);
   if (exists_binary_id(binary_id)) return binary_id;
   bid_struct=add_binary_id(binary_id);
 
@@ -544,7 +548,7 @@ uint64_t adapt_add_binary(char * binary_name){
   }
   if (set){
 #ifdef VERBOSE
-      fprintf(error_stream,"binary %s %llu %llu provides default values %d\n",binary_name,binary_id,get_binary_id(binary_name),is_binary_id_used(binary_id));
+      fprintf(error_stream,"binary %s %llu %llu provides default values %d\n",binary_name,binary_id,get_id(binary_name),is_binary_id_used(binary_id));
 #endif
     /* mark binary_id as used if there any setting */
     set_binary_id_used(binary_id,1);
@@ -566,7 +570,7 @@ uint64_t adapt_add_binary(char * binary_name){
       /* this is later used in the crid2config struct, so there is no need to free it here */
       tmp_crid_to_config_struct.infos=calloc(1,adapt_information_size);
 
-      crid=MurmurHash64A(function_name_in_cfg,strlen(function_name_in_cfg),0);
+      crid = get_id(function_name_in_cfg);
 
 #ifdef VERBOSE
       fprintf(error_stream,"Function definition:%s/%s %s %lu %lu %llu\n",binary_name_in_cfg,binary_name,function_name_in_cfg,binary_id_in_cfg_file, function_id_in_cfg_file,crid);
@@ -610,7 +614,7 @@ int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid){
      * build rid2crid which maps region id to constant region ids
      * (same over multiple runs)
      */
-    crid=MurmurHash64A(rname,strlen(rname),0);
+    crid = get_id(rname);
 #ifdef VERBOSE
     fprintf(error_stream,"Add Function definition:%s %llu %lu\n",rname,crid,rid);
 #endif
