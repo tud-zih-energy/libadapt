@@ -17,33 +17,19 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.*
  ***********************************************************************/
 
-#include <execinfo.h>
 #include <libconfig.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <pthread.h>
 #include <string.h>
 #include <unistd.h>
-#include <regex.h>
-#include <errno.h>
 
 #include <sched.h>
 
 #include "adapt.h"
 #include "adapt_internal.h"
+#include "binary_handling.h"
 
 // #define VERBOSE 1
-
-/* TODO: Reduce SoC in this file
- * put functions for the binary handling and for the settings handling
- * in separated files from the adapt realted stuff
- * to make it more readable
- * 
- * separate hashmaps should be a lot easier as the settings
- * default_infos and init_infos can stay here
- * so only the hashmaps need to move, that are only used outside of the
- * adapt functions
- * */
 
 
 /* Check if the given value is zero or not and return the
@@ -55,25 +41,11 @@
     else \
         return ADAPT_ERROR_WHILE_ADAPT;
 
-/* Free and set the given pointer to NULL 
- * */
-#define FREE_AND_NULL(a) {\
-        free(a);\
-        a = NULL;\
-}
-
-/* Check pointer and then free it
- * */
-#define CHECK_INIT_MALLOC_FREE(a) if(a)\
-    FREE_AND_NULL(a)
-
 /* unsusable stuff in the case that not enough memory is avaible 
  * */
 #define CHECK_INIT_MALLOC(a) if( (a) == NULL) { \
     config_destroy(&cfg); \
-    CHECK_INIT_MALLOC_FREE(c2conf_hashmap); \
-    CHECK_INIT_MALLOC_FREE(r2c_hashmap); \
-    CHECK_INIT_MALLOC_FREE(bids_hashmap); \
+    free_hashmaps(); \
     CHECK_INIT_MALLOC_FREE(function_stacks); \
     CHECK_INIT_MALLOC_FREE(function_stack_sizes); \
     CHECK_INIT_MALLOC_FREE(default_infos); \
@@ -82,77 +54,9 @@
     return ENOMEM; \
 }
 
-
-/* Free a list
- * static function would be nicer but is not possible for different
- * structures 
- * */
-#define FREE_LIST(current_ptr) \
-    if (current_ptr->next){ \
-        __auto_type next_ptr = current_ptr; \
-        current_ptr = current_ptr->next; \
-        FREE_AND_NULL(next_ptr);\
-        while(current_ptr->next){ \
-            next_ptr = current_ptr->next; \
-            FREE_AND_NULL(current_ptr); \
-            current_ptr = next_ptr; \
-        } \
-        FREE_AND_NULL(current_ptr); \
-    }
-
-/* relates dynamic region id (rid) passed from instrumentation framework
- * to libadapt to a constant region id (crid) computed from the hash of
- * the region name. */
-struct rid_to_crid_struct{
-  uint32_t rid;
-  uint64_t crid;
-  uint64_t binary_id;
-  char * infos;
-  int initialized;
-  struct rid_to_crid_struct * next;
-};
-
-/* relates constant region id (crid) computed from the hash of a region
- * name to a configuration. This struct is created when parsing the
- * configuration file. */
-struct crid_to_config_struct{
-  uint64_t crid;
-  uint64_t binary_id;
-  char * infos;
-  int initialized;
-  struct crid_to_config_struct * next;
-};
-
-/* This struct is used to allow multi binary support.
- * If you monitor a system for example that allows the concurrent execution
- * of different tasks, you create such a struct for each task
- * */
-struct added_binary_ids_struct{
-  uint64_t binary_id;
-  int used;
-  char * default_infos;
-  struct added_binary_ids_struct * next;
-};
-
 /* These are the global error count to supress more than one error
  * message about the maximum number of threas */
 static int supress_max_thread_count_error = 0;
-
-/* These are the global configurations from the config file  used in adapt_open and
- * adapt_add_binary
- * */
-static struct config_t cfg;
-
-/*
- * These (default_*_infos) are the defaults that are set whenever the binary
- * that is entered / exited is not defined in the config file
- * */
-static char * default_infos = NULL;
-
-/*
- * These (init_*_infos) are the initial values that are set when this library is loaded
- * */
-static char * init_infos = NULL;
 
 /**
  * these are the offset for the different knob types' information within the infos
@@ -168,221 +72,29 @@ static size_t * knob_offsets = NULL;
 static uint32_t ** function_stacks = NULL;
 static uint32_t * function_stack_sizes = NULL;
 
-/* maps described in struct definition */
-static struct crid_to_config_struct * c2conf_hashmap = NULL;
-static struct rid_to_crid_struct * r2c_hashmap = NULL;
-static struct added_binary_ids_struct * bids_hashmap = NULL;
+/*
+ * These (default_*_infos) are the defaults that are set whenever the binary
+ * that is entered / exited is not defined in the config file
+ * */
+static char * default_infos = NULL;
 
+/*
+ * These (init_*_infos) are the initial values that are set when this library is loaded
+ * */
+static char * init_infos = NULL;
 
+/* These are the global configurations from the config file  used in adapt_open and
+ * adapt_add_binary
+ * */
+static struct config_t cfg;
+
+/* default settings for stack */
 static uint32_t max_threads = 256;
-static uint32_t hash_set_size = 101;
 static uint32_t max_function_stack = 256;
 
 /* every error message should use the same stream */
 static FILE * error_stream;
 
-/*-----------------------------------------------------------------------------
- MurmurHash2, 64-bit versions, by Austin Appleby
-
- The same caveats as 32-bit MurmurHash2 apply here - beware of alignment
- and endian-ness issues if used across multiple platforms.
-
- 64-bit hash for 64-bit platforms
-*/
-
-uint64_t MurmurHash64A ( const void * key, int len, uint64_t seed )
-{
-  const uint64_t m = 0xc6a4a7935bd1e995ULL;
-  const int r = 47;
-
-  uint64_t h = seed ^ (len * m);
-
-  const uint64_t * data = (const uint64_t *)key;
-  const uint64_t * end = data + (len/8);
-
-  const unsigned char * data2;
-
-  while(data != end)
-  {
-    uint64_t k = *data++;
-
-    k *= m;
-    k ^= k >> r;
-    k *= m;
-
-    h ^= k;
-    h *= m;
-  }
-
-  data2 = (const unsigned char*)data;
-
-  switch(len & 7)
-  {
-  case 7: h ^= (uint64_t)data2[6] << 48;
-  case 6: h ^= (uint64_t)data2[5] << 40;
-  case 5: h ^= (uint64_t)data2[4] << 32;
-  case 4: h ^= (uint64_t)data2[3] << 24;
-  case 3: h ^= (uint64_t)data2[2] << 16;
-  case 2: h ^= (uint64_t)data2[1] << 8;
-  case 1: h ^= (uint64_t)data2[0];
-          h *= m;
-  };
-
-  h ^= h >> r;
-  h *= m;
-  h ^= h >> r;
-
-  return h;
-}
-
-static inline uint64_t get_id(const char * name){
-  return MurmurHash64A(name, strlen(name), 0);
-}
-
-struct added_binary_ids_struct * add_binary_id(uint64_t binary_id){
-  struct added_binary_ids_struct * current=&bids_hashmap[binary_id%hash_set_size];
-  while (current->next){
-    if ((current->binary_id==binary_id)) return current;
-    current=current->next;
-  }
-  if ((current->binary_id==binary_id)) return current;
-  current->binary_id=binary_id;
-  current->default_infos=calloc(1,adapt_information_size);
-  current->next=calloc(1,sizeof(struct added_binary_ids_struct));
-  return current;
-}
-
-struct added_binary_ids_struct * get_bid(uint64_t binary_id){
-  struct added_binary_ids_struct * current=&bids_hashmap[binary_id%hash_set_size];
-  while (current->next){
-    if ((current->binary_id==binary_id)) return current;
-    current=current->next;
-  }
-  if ((current->binary_id==binary_id)) return current;
-  return NULL;
-
-}
-
-int exists_binary_id(uint64_t binary_id){
-  if (get_bid(binary_id)) return 1;
-  return 0;
-}
-
-int is_binary_id_used(uint64_t binary_id){
-  struct added_binary_ids_struct * current=&bids_hashmap[binary_id%hash_set_size];
-  while (current->next){
-    if ((current->binary_id==binary_id)) return current->used;
-    current=current->next;
-  }
-  if ((current->binary_id==binary_id)) return current->used;
-  return 0;
-}
-
-void set_binary_id_used(uint64_t binary_id,int used){
-  struct added_binary_ids_struct * current=&bids_hashmap[binary_id%hash_set_size];
-  while (current->next){
-    if ((current->binary_id==binary_id)){
-      current->used=used;
-      return;
-    }
-    current=current->next;
-  }
-  if ((current->binary_id==binary_id)){
-    current->used=used;
-    return;
-  }
-  return;
-}
-
-/* add crid_to_config_struct */
-struct crid_to_config_struct * add_crid2config(uint64_t binary_id,uint64_t crid,struct crid_to_config_struct * tmp_crid_to_config_struct){
-  struct crid_to_config_struct * current=&c2conf_hashmap[crid%hash_set_size];
-  while (current->next){
-    if ((current->binary_id==binary_id)&&(current->crid==crid)) return current;
-    current=current->next;
-  }
-  if ((current->binary_id==binary_id)&&(current->crid==crid)) return current;
-
-  if (current->initialized){
-    current->next=calloc(1,sizeof(struct crid_to_config_struct));
-    current=current->next;
-  }
-  memcpy(current,tmp_crid_to_config_struct,sizeof(struct crid_to_config_struct));
-  current->crid=crid;
-  current->binary_id=binary_id;
-  current->next=NULL;
-  current->initialized=1;
-  return current;
-}
-/* get crid_to_config_struct */
-struct crid_to_config_struct * get_crid2config(uint64_t binary_id,uint64_t crid){
-  struct crid_to_config_struct * current=&c2conf_hashmap[crid%hash_set_size];
-  while (current->next){
-    if ((current->binary_id==binary_id)&&(current->crid==crid)) return current;
-    current=current->next;
-  }
-  if ((current->binary_id==binary_id)&&(current->crid==crid)) return current;
-  return NULL;
-}
-
-/**
- * @brief define a region id for a constant region id
- * 
- * There are constant region IDs, e.g. the hash of a name of a function that is entered and region ids that can change from run to run (e.g. the measurement systems id or handle of that region)
- * this function checks whether there is some adaption to process for a specific region.
- * if so, it adds the region id to the processed region ids.
- * @param binary_id the id of a binary retrieved with adapt_add_binary
- * @param rid the variable region id
- * @param the constant region id
- * @return 1 if there is no adaption definition or the binary id is not available or the region id is already registered<br>
- * 1 if the region has been added
- */
-int add_rid2crid(uint64_t binary_id,uint32_t rid,uint64_t crid){
-  /* exists config? */
-  struct crid_to_config_struct * c2d = get_crid2config(binary_id,crid);
-  struct rid_to_crid_struct * current;
-  if (c2d==NULL) return 1;
-  current=&r2c_hashmap[rid%hash_set_size];
-  while (current->next){
-    if ((current->binary_id==binary_id)&&(current->rid==rid)) return 1;
-    current=current->next;
-  }
-  if ((current->binary_id==binary_id)&&(current->rid==rid)) return 1;
-
-  if (current->initialized){
-    current->next=calloc(1,sizeof(struct rid_to_crid_struct));
-    current=current->next;
-  }
-  current->rid=rid;
-  memcpy(&(current->crid),c2d,sizeof(struct crid_to_config_struct));
-  current->next=NULL;
-  return 0;
-}
-/* get rid_to_crid */
-struct rid_to_crid_struct * get_rid2crid(uint64_t binary_id,uint32_t rid){
-  struct rid_to_crid_struct * current=&r2c_hashmap[rid%hash_set_size];
-  while (current->next){
-    if ((current->binary_id==binary_id)&&(current->rid==rid)) return current;
-    current=current->next;
-  }
-  if ((current->binary_id==binary_id)&&(current->rid==rid)) return current;
-  return NULL;
-}
-
-static int regex_match(const char *pattern, char *string) {
-  int status;
-  regex_t re;
-
-  if (regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
-    return (0); /* report error */
-  }
-  status = regexec(&re, string, (size_t) 0, NULL, 0);
-  regfree(&re);
-  if (status != 0) {
-    return (0); /* report error */
-  }
-  return (1);
-}
 
 int adapt_open(){
   char *file_name;
@@ -391,6 +103,7 @@ int adapt_open(){
   char buffer[1024];
   config_setting_t *setting = NULL;
   int set_default=0,set_init=0;
+  uint32_t hash_set_size=0;
 
   error_stream = stderr;
 
@@ -432,10 +145,10 @@ int adapt_open(){
     return 1;
   }
 
-  /* create hashmaps */
-  CHECK_INIT_MALLOC(c2conf_hashmap=calloc(hash_set_size,sizeof(struct crid_to_config_struct)));
-  CHECK_INIT_MALLOC(r2c_hashmap=calloc(hash_set_size,sizeof(struct rid_to_crid_struct)));
-  CHECK_INIT_MALLOC(bids_hashmap=calloc(hash_set_size,sizeof(struct added_binary_ids_struct)));
+  /* create the hashmaps with the right hash size */
+  if (init_hashmaps(hash_set_size, adapt_information_size))
+      return ENOMEM;
+
   /* create function_stacks */
   CHECK_INIT_MALLOC(function_stacks=calloc(max_threads,sizeof(uint32_t *)));
   CHECK_INIT_MALLOC(function_stack_sizes=calloc(max_threads,sizeof(uint32_t)));
@@ -845,10 +558,12 @@ void adapt_close()
 {
   int knob_index;
   int i;
-  /* if the work was already done by another thread, we have nothing to do */
-  if (!c2conf_hashmap)
-    return;
 
+  /* free the hashmaps */
+  /* if the work was already done by another thread, we have nothing to do */
+  if (free_hashmaps() == 0)
+      return;
+  
   /* first look if the work was done by another thread */
   if (function_stacks != NULL)
   {
@@ -873,28 +588,6 @@ void adapt_close()
         /* apply initial setting for current cpu */
         knobs[knob_index].process_after(&(init_infos[knob_offsets[knob_index]]),sched_getcpu());
     }
-
-  for (i=0; i < hash_set_size; i++ )
-  {
-    if ((&c2conf_hashmap[i]) != NULL)
-    {
-      struct crid_to_config_struct * current=&c2conf_hashmap[i];
-      FREE_LIST(current);
-    }
-    if ((&r2c_hashmap[i]) != NULL)
-    {
-      struct rid_to_crid_struct * current=&r2c_hashmap[i];
-      FREE_LIST(current);
-    }
-    if ((&bids_hashmap[i]) != NULL)
-    {
-      struct added_binary_ids_struct * current=&bids_hashmap[i];
-      FREE_LIST(current);
-    }
-  }
-  FREE_AND_NULL(c2conf_hashmap);
-  FREE_AND_NULL(r2c_hashmap);
-  FREE_AND_NULL(bids_hashmap);
 
   for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
   {
