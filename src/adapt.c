@@ -41,7 +41,7 @@
     else \
         return ADAPT_ERROR_WHILE_ADAPT;
 
-/* unsusable stuff in the case that not enough memory is avaible 
+/* remove unsusable stuff in the case that not enough memory is avaible 
  * */
 #define CHECK_INIT_MALLOC(a) if( (a) == NULL) { \
     config_destroy(&cfg); \
@@ -63,22 +63,21 @@ static int supress_max_thread_count_error = 0;
  */
 static size_t * knob_offsets = NULL;
 
-/*
+/**
  * These are the function stack sizes for different number of threads
  * They only support one binary. I think thats ok.
  * Otherwise one would have to use the binary number as thread_id, right?
  * */
-
 static uint32_t ** function_stacks = NULL;
 static uint32_t * function_stack_sizes = NULL;
 
-/*
+/**
  * These (default_*_infos) are the defaults that are set whenever the binary
  * that is entered / exited is not defined in the config file
  * */
 static char * default_infos = NULL;
 
-/*
+/**
  * These (init_*_infos) are the initial values that are set when this library is loaded
  * */
 static char * init_infos = NULL;
@@ -96,7 +95,8 @@ static uint32_t max_function_stack = 256;
 static FILE * error_stream;
 
 
-int adapt_open(){
+int adapt_open()
+{
   char *file_name;
   char * prefix_default="default";
   char * prefix_init="init";
@@ -109,14 +109,16 @@ int adapt_open(){
 
   /* open config */
   file_name = getenv("ADAPT_CONFIG_FILE");
-  if (file_name == NULL) {
+  if (file_name == NULL)
+  {
     fprintf(error_stream, "\"ADAPT_CONFIG_FILE\" not set\n");
     return 1;
   }
   /* initialize config file*/
   config_init(&cfg);
 
-  if (!config_read_file(&cfg, file_name)) {
+  if (!config_read_file(&cfg, file_name))
+  {
     fprintf(error_stream, "reading config file %s failed\n", file_name);
     return 1;
   }
@@ -205,7 +207,8 @@ int adapt_open(){
   return 0;
 }
 
-uint64_t adapt_add_binary(char * binary_name){
+uint64_t adapt_add_binary(char * binary_name)
+{
   config_setting_t *setting = NULL;
   int knob_index,set=0;
   char buffer[1024];
@@ -215,13 +218,21 @@ uint64_t adapt_add_binary(char * binary_name){
   uint64_t binary_id;
   const char * binary_name_in_cfg;
   struct added_binary_ids_struct * bid_struct;
-  if(function_stacks==NULL) return 0;
+  
+  if(function_stacks == NULL)
+  {
+      fprintf(error_stream,"libadapt: ERROR: function_stacks NULL\n");
+      return 0;
+  }
+  
   binary_id=get_id(binary_name);
   if (exists_binary_id(binary_id)) return binary_id;
+  
   bid_struct=add_binary_id(binary_id);
 
   /* look if binary_name  exists*/
-  for (binary_id_in_cfg_file = 0; binary_id_in_cfg_file < 32000; binary_id_in_cfg_file++) {
+  for (binary_id_in_cfg_file = 0; binary_id_in_cfg_file < 32000; binary_id_in_cfg_file++)
+  {
     sprintf(buffer, "binary_%d.name", binary_id_in_cfg_file);
     setting = config_lookup(&cfg, buffer);
     if (setting) {
@@ -236,7 +247,9 @@ uint64_t adapt_add_binary(char * binary_name){
       if (regex_match(binary_name_in_cfg, binary_name)) {
         break;
       }
-    } else {
+    }
+    else
+    {
     /* Not Found, break polite out of the function 
      * because the setting not exist and in the previous settings were
      * no matching binary name */
@@ -259,7 +272,8 @@ uint64_t adapt_add_binary(char * binary_name){
     if (knobs[knob_index].read_from_config)
       set |= knobs[knob_index].read_from_config(&(bid_struct->default_infos[knob_offsets[knob_index]]),&cfg,buffer,prefix);
   }
-  if (set){
+  if (set)
+  {
 #ifdef VERBOSE
       fprintf(error_stream,"binary %s %llu %llu provides default values %d\n",binary_name,binary_id,get_id(binary_name),is_binary_id_used(binary_id));
 #endif
@@ -269,7 +283,8 @@ uint64_t adapt_add_binary(char * binary_name){
 
   /* Read Configuration for function in config structure and register it
    * with the binary_id */
-  for (function_id_in_cfg_file = 0; function_id_in_cfg_file < 32000; function_id_in_cfg_file++) {
+  for (function_id_in_cfg_file = 0; function_id_in_cfg_file < 32000; function_id_in_cfg_file++)
+  {
     sprintf(buffer, "binary_%d.function_%d.name", binary_id_in_cfg_file, function_id_in_cfg_file);
     setting = config_lookup(&cfg, buffer);
     if (setting) {
@@ -315,13 +330,20 @@ uint64_t adapt_add_binary(char * binary_name){
   return binary_id;
 }
 
-int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid){
+int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid)
+{
   uint64_t crid;
-  if (function_stacks==NULL) return 1;
-  if (!is_binary_id_used(binary_id)) return 1;
+  if (function_stacks==NULL)
+  {
+      fprintf(error_stream,"libadapt: ERROR: function_stacks NULL\n");
+      return 1;
+  }
+
+  if (!is_binary_id_used(binary_id))
+      return 1;
 
   /* if it is not already registered */
-  if (get_rid2crid(binary_id, rid)==NULL)
+  if (get_rid2crid(binary_id, rid) == NULL)
   {
     /*
      * build rid2crid which maps region id to constant region ids
@@ -339,14 +361,16 @@ int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid){
 /**
  * Use this if you have enter AND exit handling
  */
-int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu){
+int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu)
+{
     return adapt_enter_opt_stacks(binary_id, tid, rid, cpu, 1);
 }
 
 /**
  * Use this if you have only enter handling, but no exit-handling
  */
-int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu){
+int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu)
+{
     return adapt_enter_opt_stacks(binary_id, 0, rid, cpu, 0);
 }
 
@@ -368,23 +392,23 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
     return ADAPT_NOT_INITITALIZED;
   }
 
-  if (exit_on)
+  /* only use with exit_on but for enter_no_stacks tid will be zero an
+   * so it will be lower than max_threads */
+  if (tid >= max_threads)
   {
-    if (tid >= max_threads)
+    if (!supress_max_thread_count_error)
     {
-        if (!supress_max_thread_count_error)
-        {
-        supress_max_thread_count_error = 1;
-        fprintf(error_stream, "libadapt: ERROR: maximum thread count (%d) exceeded."
-                      "Increase max_threads or set VT_PTHREAD_REUSE=yes\n"
-                      "This error is only shown once.\n",
-                      max_threads);
-        }
-        return ADAPT_ERROR_WHILE_ADAPT;
+      supress_max_thread_count_error = 1;
+      fprintf(error_stream, "libadapt: ERROR: maximum thread count (%d) exceeded."
+                            "Increase max_threads or set VT_PTHREAD_REUSE=yes\n"
+                            "This error is only shown once.\n",
+                            max_threads);
     }
+    return ADAPT_ERROR_WHILE_ADAPT;
   }
+
   /* binary not used -> use defaults */
-  if (!is_binary_id_used(binary_id) )
+  if ( !is_binary_id_used(binary_id) )
   {
 #ifdef VERBOSE
     fprintf(error_stream,"Binary not used %llu, applying defaults\n",binary_id);
@@ -404,10 +428,8 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
   }
   /* unfortunately the dct exit does not work on all compilers, so we repeat it here :( */
 #ifndef NO_DCT
-  {
-      if (exit_on)
-          omp_dct_repeat_exit();
-  }
+    if (exit_on)
+        omp_dct_repeat_exit();
 #endif
 
   if (exit_on)
@@ -420,24 +442,23 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
     /* this should be always executed if we don't use stack
      * but if we use stacks we need to look for the stack size
      * */
-  if (!exit_on || function_stack_sizes[tid] < max_function_stack)
+  if (!exit_on || (function_stack_sizes[tid] < max_function_stack) )
   {
-
 #ifdef VERBOSE
     if (exit_on)
-        fprintf(error_stream,"Enter %llu %lu %lu %lu\n",binary_id,tid,function_stack_sizes[tid],rid);
+        fprintf(error_stream,"Enter %llu %lu %lu %lu\n",binary_id, tid, function_stack_sizes[tid], rid);
     else
-        fprintf(error_stream,"Enter %lu\n",rid);
+        fprintf(error_stream,"Enter %llu %lu\n",binary_id, rid);
 #endif
     /* get the constant region id */
-    struct rid_to_crid_struct * r2d = get_rid2crid(binary_id,rid);
+    struct rid_to_crid_struct * r2d = get_rid2crid(binary_id, rid);
 
     /* if there is something to change */
     /* any adaption for region defined? */
     if (r2d != NULL)
     {
 #ifdef VERBOSE
-        fprintf(error_stream,"Crid %lu %llu\n",r2d->rid,r2d->crid);
+        fprintf(error_stream,"Crid %lu %llu\n", r2d->rid, r2d->crid);
 #endif
         /* do adapt */
         for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
@@ -488,21 +509,22 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu)
 #endif
     return ADAPT_NOT_INITITALIZED;
   }
+
   if (tid >= max_threads)
   {
     if (!supress_max_thread_count_error)
     {
       supress_max_thread_count_error = 1;
       fprintf(error_stream, "libadapt: ERROR: maximum thread count (%d) exceeded."
-                      "Increase max_threads or set VT_PTHREAD_REUSE=yes\n"
-                      "This error is only shown once.\n",
-                      max_threads);
+                            "Increase max_threads or set VT_PTHREAD_REUSE=yes\n"
+                            "This error is only shown once.\n",
+                            max_threads);
     }
     return ADAPT_ERROR_WHILE_ADAPT;
   }
 
   /* binary not defined? use defaults! */
-  if (!is_binary_id_used(binary_id))
+  if ( !is_binary_id_used(binary_id) )
   {
 #ifdef VERBOSE
     fprintf(error_stream,"Exit default\n");
@@ -518,13 +540,15 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu)
 
       RETURN_ADAPT_STATUS(ok);
   }
+
   /* only if region is on stack */
-  if ((function_stack_sizes[tid] - 1) >= 0)
+  if ( (function_stack_sizes[tid] - 1) >= 0)
   {
 #ifdef VERBOSE
-    fprintf(error_stream,"Exit %lu %lu %lu \n",tid,function_stack_sizes[tid],function_stacks[tid][function_stack_sizes[tid] - 1]);
+    fprintf(error_stream,"Exit %lu %lu %lu \n",tid, function_stack_sizes[tid], function_stacks[tid][function_stack_sizes[tid] - 1]);
 #endif
     /* get region definition */
+    /* This  function_stacks[tid][function_stack_sizes[tid] - 1] is the saved rid */
     struct rid_to_crid_struct * r2d = get_rid2crid(binary_id,function_stacks[tid][function_stack_sizes[tid] - 1]);
 
     /* if there is a region definition */
@@ -576,6 +600,7 @@ void adapt_close()
     {
         FREE_AND_NULL(tmp[i]);
     }
+
     FREE_AND_NULL(tmp);
     FREE_AND_NULL(function_stack_sizes);
   }
