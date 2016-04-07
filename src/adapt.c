@@ -432,18 +432,22 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
         omp_dct_repeat_exit();
 #endif
 
+  /* we only need the stack if we want to use them */
   if (exit_on)
   {
     /* add to stack / stack to large? */
     if (function_stacks[tid] == NULL)
-        function_stacks[tid] = calloc(max_function_stack,sizeof(uint32_t));
+        /* if the entry for the tid doesn't exist we create it */
+        function_stacks[tid] = calloc(max_function_stack, sizeof(uint32_t));
   }
     /* check for max stack size */
-    /* this should be always executed if we don't use stack
-     * but if we use stacks we need to look for the stack size
+    /* this should be always executed if we don't use the stack
+     * but if we use the stack we need to look for the stack size
      * */
   if (!exit_on || (function_stack_sizes[tid] < max_function_stack) )
   {
+      /* here will ok be zero, so if something went wrong
+       * RETURN_ADAPT_STATUS will see it */
 #ifdef VERBOSE
     if (exit_on)
         fprintf(error_stream,"Enter %llu %lu %lu %lu\n",binary_id, tid, function_stack_sizes[tid], rid);
@@ -453,7 +457,6 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
     /* get the constant region id */
     struct rid_to_crid_struct * r2d = get_rid2crid(binary_id, rid);
 
-    /* if there is something to change */
     /* any adaption for region defined? */
     if (r2d != NULL)
     {
@@ -510,6 +513,9 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu)
     return ADAPT_NOT_INITITALIZED;
   }
 
+  /* if the tid bigger than max_threads it woudn't append to the
+   * function_stack and so we have nothing to do
+   * Maybe the wrong tid was used */
   if (tid >= max_threads)
   {
     if (!supress_max_thread_count_error)
@@ -541,7 +547,9 @@ int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu)
       RETURN_ADAPT_STATUS(ok);
   }
 
-  /* only if region is on stack */
+  /* the binary_id is used so we have more to do */
+
+  /* only if region id is on stack */
   if ( (function_stack_sizes[tid] - 1) >= 0)
   {
 #ifdef VERBOSE
