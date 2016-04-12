@@ -257,6 +257,8 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid, int32_t cpu);
  * @param cpu the current CPU of the thread or negative (then libadapt will
  *        gather the current CPU).
  * @param stack_on switch for stack handling (zero means no stack handling and no thread save handling)
+ * @param exit handle if we exit the region or enter (zero means we want
+ *        to got in the region)
  * @returns 0 if something has been set
  *          1 if nothing had been set
  *          2 if some error occured
@@ -264,7 +266,7 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid, int32_t cpu);
 /**
  * Use this for both with optional switch for exit handling
  */
-int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int stack_on);
+int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int stack_on, int exit);
 
 /**
  * @brief exit a specific region

@@ -363,7 +363,7 @@ int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid)
  */
 int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu)
 {
-    return adapt_enter_opt_stacks(binary_id, tid, rid, cpu, 1);
+    return adapt_enter_or_exit(binary_id, tid, rid, cpu, 1, 0);
 }
 
 /**
@@ -371,27 +371,33 @@ int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cp
  */
 int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu)
 {
-    return adapt_enter_opt_stacks(binary_id, 0, rid, cpu, 0);
+    return adapt_enter_or_exit(binary_id, 0, rid, cpu, 0, 0);
 }
 
 /**
  * Use this for both with optional stack switch
  */
-int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int stack_on)
+int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int stack_on, int exit)
 {
   int knob_index;
   int ok=0;
 
 #ifdef VERBOSE
-  fprintf(error_stream,"Enter test function stacks\n");
+  if (stack_on)
+    fprintf(error_stream,"Enter test function stacks\n");
 #endif
 
   if (function_stacks == NULL)
   {
+#ifdef VERBOSE
     fprintf(error_stream,"libadapt: ERROR: function_stacks NULL\n");
+#endif
     return ADAPT_NOT_INITITALIZED;
   }
 
+  /* if the tid bigger than max_threads it woudn't append to the
+   * function_stack and so we have nothing to do
+   * Maybe the wrong tid was used */
   /* only use with stack_on but for enter_no_stacks tid will be zero an
    * so it will be lower than max_threads */
   if (tid >= max_threads)
@@ -411,51 +417,78 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
   if ( !is_binary_id_used(binary_id) )
   {
 #ifdef VERBOSE
-    fprintf(error_stream,"Binary not used %llu, applying defaults\n",binary_id);
+    if (!exit)
+        fprintf(error_stream,"Binary not used %llu, applying defaults\n",binary_id);
+    else
+        fprintf(error_stream,"Binary not used %llu, exit defaults\n",binary_id);
 #endif
     if (default_infos)
     {
       for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
       {
-        if (knobs[knob_index].process_before)
-            ok |= knobs[knob_index].process_before(&(default_infos[knob_offsets[knob_index]]),cpu);
+        if (!exit)
+        {
+            if (knobs[knob_index].process_before)
+                ok |= knobs[knob_index].process_before(&(default_infos[knob_offsets[knob_index]]),cpu);
+        }
+        else
+        {
+            if (knobs[knob_index].process_after)
+                ok |= knobs[knob_index].process_after(&(default_infos[knob_offsets[knob_index]]),cpu);
+        }
       }
 
       RETURN_ADAPT_STATUS(ok);
     }
     else
-        return ADAPT_NO_ACTUAL_ADAPT;
+        if (!exit)
+            return ADAPT_NO_ACTUAL_ADAPT;
   }
   /* unfortunately the dct exit does not work on all compilers, so we repeat it here :( */
 #ifndef NO_DCT
-    if (stack_on)
+    if (stack_on && !exit)
         omp_dct_repeat_exit();
 #endif
 
-  /* we only need the stack if we want to use them */
-  if (stack_on)
+  /* we only need the stack if we want to use them and if we don't want
+   * to exit */
+  if (stack_on && !exit)
   {
     /* add to stack / stack to large? */
     if (function_stacks[tid] == NULL)
         /* if the entry for the tid doesn't exist we create it */
         function_stacks[tid] = calloc(max_function_stack, sizeof(uint32_t));
   }
-    /* check for max stack size */
+    /* check for max stack size or the if there any rid on the stack for
+     * the specific tid
+     * the difference makes the exit switch */
     /* this should be always executed if we don't use the stack
      * but if we use the stack we need to look for the stack size
      * */
-  if (!stack_on || (function_stack_sizes[tid] < max_function_stack) )
+  if (!stack_on || (!exit && (function_stack_sizes[tid] < max_function_stack)) || (exit && (function_stack_sizes[tid] - 1) >= 0) )
   {
       /* here will ok be zero, so if something went wrong
        * RETURN_ADAPT_STATUS will see it */
 #ifdef VERBOSE
-    if (stack_on)
-        fprintf(error_stream,"Enter %llu %lu %lu %lu\n",binary_id, tid, function_stack_sizes[tid], rid);
+    if (!exit)
+    {
+        if (stack_on)
+            fprintf(error_stream,"Enter %llu %lu %lu %lu\n",binary_id, tid, function_stack_sizes[tid], rid);
+        else
+            fprintf(error_stream,"Enter %llu %lu\n",binary_id, rid);
+    }
     else
-        fprintf(error_stream,"Enter %llu %lu\n",binary_id, rid);
+        fprintf(error_stream,"Exit %lu %lu %lu \n",tid, function_stack_sizes[tid], function_stacks[tid][function_stack_sizes[tid] - 1]);
+
 #endif
     /* get the constant region id */
-    struct rid_to_crid_struct * r2d = get_rid2crid(binary_id, rid);
+    struct rid_to_crid_struct * r2d = NULL;
+    /* get the right structure for the rid */
+    if (!exit)
+        r2d = get_rid2crid(binary_id, rid);
+    else
+        /* This  function_stacks[tid][function_stack_sizes[tid] - 1] is the saved rid */
+        r2d = get_rid2crid(binary_id,function_stacks[tid][function_stack_sizes[tid] - 1]);
 
     /* any adaption for region defined? */
     if (r2d != NULL)
@@ -466,15 +499,27 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
         /* do adapt */
         for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
         {
-            if (knobs[knob_index].process_before)
-                ok |=knobs[knob_index].process_before(&(r2d->infos[knob_offsets[knob_index]]),cpu);
+            if (!exit)
+            {
+                if (knobs[knob_index].process_before)
+                    ok |=knobs[knob_index].process_before(&(r2d->infos[knob_offsets[knob_index]]),cpu);
+            }
+            else
+            {
+                if (knobs[knob_index].process_after)
+                    ok |= knobs[knob_index].process_after(&(r2d->infos[knob_offsets[knob_index]]),cpu);
+
+            }
         }
     }
     /* no definition for reason -> use defaults */
     else
     {
 #ifdef VERBOSE
-        fprintf(error_stream,"Enter binary default\n");
+        if (!exit)
+            fprintf(error_stream,"Enter binary default\n");
+        else
+            fprintf(error_stream,"Exit binary default\n");
 #endif
         /* get struct for defaults */
         struct added_binary_ids_struct * bid = get_bid(binary_id);
@@ -482,108 +527,40 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
         /* apply default settings for binary */
         for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
         {
-            if (knobs[knob_index].process_before)
-                ok |= knobs[knob_index].process_before(&(bid->default_infos[knob_offsets[knob_index]]),cpu);
+            if (!exit)
+            {
+                if (knobs[knob_index].process_before)
+                    ok |= knobs[knob_index].process_before(&(bid->default_infos[knob_offsets[knob_index]]),cpu);
+            }
+            else
+            {
+                if (knobs[knob_index].process_after)
+                    ok |= knobs[knob_index].process_after(&(bid->default_infos[knob_offsets[knob_index]]),cpu);
+            }
         }
     }
 
-    if (stack_on)
+    if (!exit)
     {
-        /* save the rgeion id for this thread */
-        function_stacks[tid][function_stack_sizes[tid]] = rid;
-        /* increase stack size immediately afterwards */
-        function_stack_sizes[tid]++;
-
+        if (stack_on)
+        {
+            /* save the rgeion id for this thread */
+            function_stacks[tid][function_stack_sizes[tid]] = rid;
+            /* increase stack size immediately afterwards */
+            function_stack_sizes[tid]++;
+        }
     }
+    else
+        /* decrease stack size */
+        function_stack_sizes[tid]--;
   }
 
   RETURN_ADAPT_STATUS(ok);
 }
 
-int adapt_exit(uint64_t binary_id,uint32_t tid,int32_t cpu)
+int adapt_exit(uint64_t binary_id, uint32_t tid, int32_t cpu)
 {
-  int knob_index;
-  int ok = 0;
-
-  if (function_stacks == NULL)
-  {
-#ifdef VERBOSE
-    fprintf(error_stream,"libadapt: ERROR: function_stacks NULL\n");
-#endif
-    return ADAPT_NOT_INITITALIZED;
-  }
-
-  /* if the tid bigger than max_threads it woudn't append to the
-   * function_stack and so we have nothing to do
-   * Maybe the wrong tid was used */
-  if (tid >= max_threads)
-  {
-    if (!supress_max_thread_count_error)
-    {
-      supress_max_thread_count_error = 1;
-      fprintf(error_stream, "libadapt: ERROR: maximum thread count (%d) exceeded."
-                            "Increase max_threads or set VT_PTHREAD_REUSE=yes\n"
-                            "This error is only shown once.\n",
-                            max_threads);
-    }
-    return ADAPT_ERROR_WHILE_ADAPT;
-  }
-
-  /* binary not defined? use defaults! */
-  if ( !is_binary_id_used(binary_id) )
-  {
-#ifdef VERBOSE
-    fprintf(error_stream,"Exit default\n");
-#endif
-
-    /* if there are defaults, apply them */
-    if (default_infos)
-      for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
-      {
-        if (knobs[knob_index].process_after)
-          ok |= knobs[knob_index].process_after(&(default_infos[knob_offsets[knob_index]]),cpu);
-      }
-
-      RETURN_ADAPT_STATUS(ok);
-  }
-
-  /* the binary_id is used so we have more to do */
-
-  /* only if region id is on stack */
-  if ( (function_stack_sizes[tid] - 1) >= 0)
-  {
-#ifdef VERBOSE
-    fprintf(error_stream,"Exit %lu %lu %lu \n",tid, function_stack_sizes[tid], function_stacks[tid][function_stack_sizes[tid] - 1]);
-#endif
-    /* get region definition */
-    /* This  function_stacks[tid][function_stack_sizes[tid] - 1] is the saved rid */
-    struct rid_to_crid_struct * r2d = get_rid2crid(binary_id,function_stacks[tid][function_stack_sizes[tid] - 1]);
-
-    /* if there is a region definition */
-    if (r2d != NULL)
-    {
-	    for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
-	    {
-	      if (knobs[knob_index].process_after)
-	        ok |= knobs[knob_index].process_after(&(r2d->infos[knob_offsets[knob_index]]),cpu);
-        }
-
-    }
-    else /* if there is no region definition, apply defaults */
-    {
-      struct added_binary_ids_struct * bid = get_bid(binary_id);
-
-      for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
-      {
-        if (knobs[knob_index].process_after)
-          ok |= knobs[knob_index].process_after(&(bid->default_infos[knob_offsets[knob_index]]),cpu);
-      }
-    }
-    /* decrease stack size */
-    function_stack_sizes[tid]--;
-  }
-
-  RETURN_ADAPT_STATUS(ok);
+    return adapt_enter_or_exit(binary_id, tid, 0, cpu, 1, 1);
 }
 
 void adapt_close()
