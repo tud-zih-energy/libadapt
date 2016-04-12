@@ -43,7 +43,7 @@
 
 /* remove unsusable stuff in the case that not enough memory is avaible 
  * */
-#define CHECK_INIT_MALLOC(a) if( (a) == NULL) { \
+#define CHECK_INIT_MALLOC(_a) if( (_a) == NULL) { \
     config_destroy(&cfg); \
     free_hashmaps(); \
     CHECK_INIT_MALLOC_FREE(function_stacks); \
@@ -53,6 +53,21 @@
     CHECK_INIT_MALLOC_FREE(knob_offsets); \
     return ENOMEM; \
 }
+
+#define KNOBS_LOOP(_array, _index, _switch, _status, _cpu) \
+    for (_index = 0; _index < ADAPT_MAX; _index++ ) \
+    { \
+        if (!_switch) \
+        { \
+            if (knobs[_index].process_before) \
+                _status |=knobs[_index].process_before(&(_array[knob_offsets[_index]]),_cpu); \
+        } \
+        else \
+        { \
+            if (knobs[_index].process_after) \
+                _status |= knobs[_index].process_after(&(_array[knob_offsets[_index]]),_cpu); \
+        } \
+    }
 
 /* These are the global error count to supress more than one error
  * message about the maximum number of threas */
@@ -375,7 +390,7 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu)
 }
 
 /**
- * Use this for both with optional stack switch
+ * Use this for everything enter with optional stack and exit
  */
 int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int stack_on, int exit)
 {
@@ -424,21 +439,8 @@ int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t c
 #endif
     if (default_infos)
     {
-      for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
-      {
-        if (!exit)
-        {
-            if (knobs[knob_index].process_before)
-                ok |= knobs[knob_index].process_before(&(default_infos[knob_offsets[knob_index]]),cpu);
-        }
-        else
-        {
-            if (knobs[knob_index].process_after)
-                ok |= knobs[knob_index].process_after(&(default_infos[knob_offsets[knob_index]]),cpu);
-        }
-      }
-
-      RETURN_ADAPT_STATUS(ok);
+        KNOBS_LOOP(default_infos, knob_index, exit, ok, cpu);
+        RETURN_ADAPT_STATUS(ok);
     }
     else
         if (!exit)
@@ -459,16 +461,24 @@ int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t c
         /* if the entry for the tid doesn't exist we create it */
         function_stacks[tid] = calloc(max_function_stack, sizeof(uint32_t));
   }
-    /* check for max stack size or the if there any rid on the stack for
+    /* check for max stack size or if there any rid on the stack for
      * the specific tid
      * the difference makes the exit switch */
     /* this should be always executed if we don't use the stack
      * but if we use the stack we need to look for the stack size
      * */
-  if (!stack_on || (!exit && (function_stack_sizes[tid] < max_function_stack)) || (exit && (function_stack_sizes[tid] - 1) >= 0) )
+  if (!stack_on || (!exit && (function_stack_sizes[tid] < max_function_stack)) || (exit && (function_stack_sizes[tid] >= 1)) )
   {
       /* here will ok be zero, so if something went wrong
        * RETURN_ADAPT_STATUS will see it */
+
+      /* if we want to exit we get the rid from the stack*/
+      if (exit)
+      {
+          /* This  function_stacks[tid][function_stack_sizes[tid] - 1] is the saved rid */
+          rid = function_stacks[tid][function_stack_sizes[tid] - 1];
+      }
+
 #ifdef VERBOSE
     if (!exit)
     {
@@ -478,17 +488,10 @@ int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t c
             fprintf(error_stream,"Enter %llu %lu\n",binary_id, rid);
     }
     else
-        fprintf(error_stream,"Exit %lu %lu %lu \n",tid, function_stack_sizes[tid], function_stacks[tid][function_stack_sizes[tid] - 1]);
-
+        fprintf(error_stream,"Exit %llu %lu %lu %lu \n",binary_id tid, function_stack_sizes[tid], rid);
 #endif
     /* get the constant region id */
-    struct rid_to_crid_struct * r2d = NULL;
-    /* get the right structure for the rid */
-    if (!exit)
-        r2d = get_rid2crid(binary_id, rid);
-    else
-        /* This  function_stacks[tid][function_stack_sizes[tid] - 1] is the saved rid */
-        r2d = get_rid2crid(binary_id,function_stacks[tid][function_stack_sizes[tid] - 1]);
+    struct rid_to_crid_struct * r2d = get_rid2crid(binary_id, rid);
 
     /* any adaption for region defined? */
     if (r2d != NULL)
@@ -497,20 +500,7 @@ int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t c
         fprintf(error_stream,"Crid %lu %llu\n", r2d->rid, r2d->crid);
 #endif
         /* do adapt */
-        for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
-        {
-            if (!exit)
-            {
-                if (knobs[knob_index].process_before)
-                    ok |=knobs[knob_index].process_before(&(r2d->infos[knob_offsets[knob_index]]),cpu);
-            }
-            else
-            {
-                if (knobs[knob_index].process_after)
-                    ok |= knobs[knob_index].process_after(&(r2d->infos[knob_offsets[knob_index]]),cpu);
-
-            }
-        }
+        KNOBS_LOOP(r2d->infos, knob_index, exit, ok, cpu);
     }
     /* no definition for reason -> use defaults */
     else
@@ -525,19 +515,7 @@ int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t c
         struct added_binary_ids_struct * bid = get_bid(binary_id);
 
         /* apply default settings for binary */
-        for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
-        {
-            if (!exit)
-            {
-                if (knobs[knob_index].process_before)
-                    ok |= knobs[knob_index].process_before(&(bid->default_infos[knob_offsets[knob_index]]),cpu);
-            }
-            else
-            {
-                if (knobs[knob_index].process_after)
-                    ok |= knobs[knob_index].process_after(&(bid->default_infos[knob_offsets[knob_index]]),cpu);
-            }
-        }
+        KNOBS_LOOP(bid->default_infos, knob_index, exit, ok, cpu);
     }
 
     if (!exit)
@@ -567,6 +545,7 @@ void adapt_close()
 {
   int knob_index;
   int i;
+  int ok = 0;
 
   /* free the hashmaps */
   /* if the work was already done by another thread, we have nothing to do */
@@ -592,12 +571,13 @@ void adapt_close()
 
   /* init infos? */
   if ( init_infos )
-    for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
-    {
-      if (knobs[knob_index].process_after)
-        /* apply initial setting for current cpu */
-        knobs[knob_index].process_after(&(init_infos[knob_offsets[knob_index]]),sched_getcpu());
-    }
+    /* apply initial setting for current cpu
+     * we want to exit so we set the switch to 1 */
+    KNOBS_LOOP(init_infos, knob_index, 1, ok, sched_getcpu());
+
+#ifdef VERBOSE
+  printf(error_stream, "Status of applying initial infos at closing: %d\n", ok)
+#endif
 
   for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
   {
