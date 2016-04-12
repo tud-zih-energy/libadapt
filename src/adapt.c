@@ -54,6 +54,10 @@
     return ENOMEM; \
 }
 
+/* loop through all the knobs and apply the settings in _array for
+ * before or atfer at _cpu depend on _switch and save the result for
+ * RETURN_ADAPT_STATUS() in  _status
+ * _switch == 0 means use settings for before */
 #define KNOBS_LOOP(_array, _index, _switch, _status, _cpu) \
     for (_index = 0; _index < ADAPT_MAX; _index++ ) \
     { \
