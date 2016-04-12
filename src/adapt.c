@@ -377,7 +377,7 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu)
 /**
  * Use this for both with optional stack switch
  */
-int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int exit_on)
+int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int stack_on)
 {
   int knob_index;
   int ok=0;
@@ -392,7 +392,7 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
     return ADAPT_NOT_INITITALIZED;
   }
 
-  /* only use with exit_on but for enter_no_stacks tid will be zero an
+  /* only use with stack_on but for enter_no_stacks tid will be zero an
    * so it will be lower than max_threads */
   if (tid >= max_threads)
   {
@@ -428,12 +428,12 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
   }
   /* unfortunately the dct exit does not work on all compilers, so we repeat it here :( */
 #ifndef NO_DCT
-    if (exit_on)
+    if (stack_on)
         omp_dct_repeat_exit();
 #endif
 
   /* we only need the stack if we want to use them */
-  if (exit_on)
+  if (stack_on)
   {
     /* add to stack / stack to large? */
     if (function_stacks[tid] == NULL)
@@ -444,12 +444,12 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
     /* this should be always executed if we don't use the stack
      * but if we use the stack we need to look for the stack size
      * */
-  if (!exit_on || (function_stack_sizes[tid] < max_function_stack) )
+  if (!stack_on || (function_stack_sizes[tid] < max_function_stack) )
   {
       /* here will ok be zero, so if something went wrong
        * RETURN_ADAPT_STATUS will see it */
 #ifdef VERBOSE
-    if (exit_on)
+    if (stack_on)
         fprintf(error_stream,"Enter %llu %lu %lu %lu\n",binary_id, tid, function_stack_sizes[tid], rid);
     else
         fprintf(error_stream,"Enter %llu %lu\n",binary_id, rid);
@@ -487,7 +487,7 @@ int adapt_enter_opt_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_
         }
     }
 
-    if (exit_on)
+    if (stack_on)
     {
         /* save the rgeion id for this thread */
         function_stacks[tid][function_stack_sizes[tid]] = rid;
