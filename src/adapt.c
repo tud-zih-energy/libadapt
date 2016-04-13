@@ -54,24 +54,6 @@
     return ENOMEM; \
 }
 
-/* loop through all the knobs and apply the settings in _array for
- * before or atfer at _cpu depend on _switch and save the result for
- * RETURN_ADAPT_STATUS() in  _status
- * _switch == 0 means use settings for before */
-#define KNOBS_LOOP(_array, _index, _switch, _status, _cpu) \
-    for (_index = 0; _index < ADAPT_MAX; _index++ ) \
-    { \
-        if (!_switch) \
-        { \
-            if (knobs[_index].process_before) \
-                _status |=knobs[_index].process_before(&(_array[knob_offsets[_index]]),_cpu); \
-        } \
-        else \
-        { \
-            if (knobs[_index].process_after) \
-                _status |= knobs[_index].process_after(&(_array[knob_offsets[_index]]),_cpu); \
-        } \
-    }
 
 /* These are the global error count to supress more than one error
  * message about the maximum number of threas */
@@ -113,6 +95,31 @@ static uint32_t max_function_stack = 256;
 /* every error message should use the same stream */
 static FILE * error_stream;
 
+
+/* loop through all the knobs and apply the settings in settings for
+ * before or atfer at cpu depend on exit and save the result for
+ * RETURN_ADAPT_STATUS() in ok
+ * exit == 0 means use settings for before */
+int knobs_loop(char * settings, int exit, int32_t cpu )
+{
+  int i;
+  int ok = 0;
+  for (i = 0; i < ADAPT_MAX; i++ )
+  {
+    if (!exit)
+    {
+      if (knobs[i].process_before)
+        ok |=knobs[i].process_before(&(settings[knob_offsets[i]]),cpu);
+    }
+    else
+    {
+      if (knobs[i].process_after)
+        ok |= knobs[i].process_after(&(settings[knob_offsets[i]]),cpu);
+    }
+  }
+  /* give the status of the processes back */
+  return ok;
+}
 
 int adapt_open()
 {
@@ -398,8 +405,7 @@ int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu)
  */
 int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int stack_on, int exit)
 {
-  int knob_index;
-  int ok=0;
+  int ok = 0;
 
 #ifdef VERBOSE
   if (stack_on)
@@ -443,7 +449,7 @@ int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t c
 #endif
     if (default_infos)
     {
-        KNOBS_LOOP(default_infos, knob_index, exit, ok, cpu);
+        ok = knobs_loop(default_infos, exit, cpu);
         RETURN_ADAPT_STATUS(ok);
     }
     else
@@ -504,7 +510,7 @@ int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t c
         fprintf(error_stream,"Crid %lu %llu\n", r2d->rid, r2d->crid);
 #endif
         /* do adapt */
-        KNOBS_LOOP(r2d->infos, knob_index, exit, ok, cpu);
+        ok = knobs_loop(r2d->infos, exit, cpu);
     }
     /* no definition for reason -> use defaults */
     else
@@ -519,7 +525,7 @@ int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t c
         struct added_binary_ids_struct * bid = get_bid(binary_id);
 
         /* apply default settings for binary */
-        KNOBS_LOOP(bid->default_infos, knob_index, exit, ok, cpu);
+        ok = knobs_loop(bid->default_infos, exit, cpu);
     }
 
     if (!exit)
@@ -549,7 +555,6 @@ void adapt_close()
 {
   int knob_index;
   int i;
-  int ok = 0;
 
   /* free the hashmaps */
   /* if the work was already done by another thread, we have nothing to do */
@@ -575,9 +580,15 @@ void adapt_close()
 
   /* init infos? */
   if ( init_infos )
+  {
     /* apply initial setting for current cpu
      * we want to exit so we set the switch to 1 */
-    KNOBS_LOOP(init_infos, knob_index, 1, ok, sched_getcpu());
+#ifdef VERBOSE
+    int ok = knobs_loop(init_infos, 1, sched_getcpu());
+#else
+    knobs_loop(init_infos, 1, sched_getcpu());
+#endif
+  }
 
 #ifdef VERBOSE
   printf(error_stream, "Status of applying initial infos at closing: %d\n", ok)
