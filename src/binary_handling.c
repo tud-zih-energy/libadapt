@@ -70,7 +70,7 @@ static size_t adapt_information_size;
  * 64-bit hash for 64-bit platforms
  * */
 
-uint64_t MurmurHash64A ( const void * key, int len, uint64_t seed )
+static uint64_t MurmurHash64A ( const void * key, int len, uint64_t seed )
 {
     const uint64_t m = 0xc6a4a7935bd1e995ULL;
     const int r = 47;
@@ -219,7 +219,7 @@ struct crid_to_config_struct * add_crid2config(uint64_t binary_id,uint64_t crid,
     return current;
 }
 /* get crid_to_config_struct */
-struct crid_to_config_struct * get_crid2config(uint64_t binary_id,uint64_t crid)
+static struct crid_to_config_struct * get_crid2config(uint64_t binary_id,uint64_t crid)
 {
     struct crid_to_config_struct * current=&c2conf_hashmap[crid%hash_set_size];
     while (current->next){

@@ -246,31 +246,6 @@ int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid, int32_t c
 int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid, int32_t cpu);
 
 /**
- * @brief enter or sample a certain region with optional stack handling
- *        or exit the last region
- * @see adapt_enter_stacks
- * @see adapt_enter_no_stacks
- * @see adapt_exit
- *
- * @param binary_id the ID generated with adapt_add_binary()
- * @param tid ID of the current thread, you should start counting tids from 0, the maximal nr of allowed tids is defined in adapt.c
- * @param rid ID of the region that is entered. If can be defined with
- *        adapt_def_region() but does not have to be defined.
- * @param cpu the current CPU of the thread or negative (then libadapt will
- *        gather the current CPU).
- * @param stack_on switch for stack handling (zero means no stack handling and no thread save handling)
- * @param exit handle if we exit the region or enter (zero means we want
- *        to got in the region)
- * @returns 0 if something has been set
- *          1 if nothing had been set
- *          2 if some error occured
- */
-/**
- * Use this for everything enter with optional stack and exit
- */
-int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int stack_on, int exit);
-
-/**
  * @brief exit a specific region
  *
  * @see adapt_enter_stacks()

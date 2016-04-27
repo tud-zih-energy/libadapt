@@ -100,7 +100,7 @@ static FILE * error_stream;
  * before or atfer at cpu depend on exit and save the result for
  * RETURN_ADAPT_STATUS() in ok
  * exit == 0 means use settings for before */
-int knobs_loop(char * settings, int exit, int32_t cpu )
+static int knobs_loop(char * settings, int exit, int32_t cpu )
 {
   int i;
   int ok = 0;
@@ -385,25 +385,10 @@ int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid)
 }
 
 /**
- * Use this if you have enter AND exit handling
- */
-int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu)
-{
-    return adapt_enter_or_exit(binary_id, tid, rid, cpu, 1, 0);
-}
-
-/**
- * Use this if you have only enter handling, but no exit-handling
- */
-int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu)
-{
-    return adapt_enter_or_exit(binary_id, 0, rid, cpu, 0, 0);
-}
-
-/**
  * Use this for everything enter with optional stack and exit
+ * the other function will only be a wrapper for this one
  */
-int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int stack_on, int exit)
+static int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu, int stack_on, int exit)
 {
   int ok = 0;
 
@@ -544,6 +529,22 @@ int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t c
   }
 
   RETURN_ADAPT_STATUS(ok);
+}
+
+/**
+ * Use this if you have enter AND exit handling
+ */
+int adapt_enter_stacks(uint64_t binary_id, uint32_t tid, uint32_t rid,int32_t cpu)
+{
+  return adapt_enter_or_exit(binary_id, tid, rid, cpu, 1, 0);
+}
+
+/**
+ * Use this if you have only enter handling, but no exit-handling
+ */
+int adapt_enter_no_stacks(uint64_t binary_id, uint32_t rid,int32_t cpu)
+{
+  return adapt_enter_or_exit(binary_id, 0, rid, cpu, 0, 0);
 }
 
 int adapt_exit(uint64_t binary_id, uint32_t tid, int32_t cpu)
