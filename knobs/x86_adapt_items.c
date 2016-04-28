@@ -1,3 +1,22 @@
+/***********************************************************************
+ * Copyright (c) 2010-2016 Technische Universitaet Dresden             *
+ *                                                                     *
+ * This file is part of libadapt.                                      *
+ *                                                                     *
+ * libadapt is free software: you can redistribute it and/or modify    *
+ * it under the terms of the GNU General Public License as published by*
+ * the Free Software Foundation, either version 3 of the License, or   *
+ * (at your option) any later version.                                 *
+ *                                                                     *
+ * This program is distributed in the hope that it will be useful,     *
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ * GNU General Public License for more details.                        *
+ *                                                                     *
+ * You should have received a copy of the GNU General Public License   *
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.*
+ ***********************************************************************/
+
 /*
  * x86_adapt_items.c
  *
@@ -44,6 +63,9 @@ static void init_info(struct pref_setting_ids * settings, int ci_nr, int64_t set
   settings->id=ci_nr;
   settings->setting=setting;
   if (ci_nr>=nr_changes){
+    /* if realloc failed the loop in the next step will also fail
+     * immediately at the beginnig 
+     * maybe the best error handling */
     changes=realloc(changes,(ci_nr+1)*sizeof(struct change));
     for (i=nr_changes;i<=ci_nr;i++){
       changes[i].cpus_used=calloc((nr_cpus/64)+1,sizeof(uint64_t));
@@ -101,6 +123,8 @@ int x86_adapt_read_from_config(void * vp,struct config_t * cfg, char * buffer,
       setting = config_lookup(cfg, buffer);
       if (setting){
         info->settings_before=realloc(info->settings_before,(info->nr_settings_before+1)*sizeof(struct pref_setting_ids));
+        /* init_info will immediately fail at settings->setting=setting
+         * */
         init_info(
             &info->settings_before[info->nr_settings_before],
             ci_nr,
@@ -140,7 +164,7 @@ int x86_adapt_read_from_config(void * vp,struct config_t * cfg, char * buffer,
           prefix ,X86_ADAPT_PREF_CONFIG_STRING, ci.name);
       setting = config_lookup(cfg, buffer);
       if (setting){
-        /* add it to info */
+        /* add it to info */ 
         info->settings_after_all=realloc(info->settings_after_all,(info->nr_settings_after_all+1)*sizeof(struct pref_setting_ids));
         init_info(
             &info->settings_after_all[info->nr_settings_after_all],

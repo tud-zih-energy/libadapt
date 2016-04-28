@@ -1,3 +1,22 @@
+/***********************************************************************
+ * Copyright (c) 2010-2016 Technische Universitaet Dresden             *
+ *                                                                     *
+ * This file is part of libadapt.                                      *
+ *                                                                     *
+ * libadapt is free software: you can redistribute it and/or modify    *
+ * it under the terms of the GNU General Public License as published by*
+ * the Free Software Foundation, either version 3 of the License, or   *
+ * (at your option) any later version.                                 *
+ *                                                                     *
+ * This program is distributed in the hope that it will be useful,     *
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ * GNU General Public License for more details.                        *
+ *                                                                     *
+ * You should have received a copy of the GNU General Public License   *
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.*
+ ***********************************************************************/
+
 /* requied for strdup */
 #define _POSIX_C_SOURCE 200809L
 
@@ -12,7 +31,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
-/* TODO: check if gcd is still correct! If x == 0 it should return y, right? */
+/* #define VERBOSE 1 */
+
+/* find the greatest common divisor, if x == 0 it returns y */
 static unsigned long gcd(unsigned long x, unsigned long y) {
     unsigned long r;
     assert(y > 0);
@@ -61,18 +82,24 @@ static void freq_str_init() {
         if (caf->frequency % 10000 == 1000) {
             assert(0 == freq_turbo);
             freq_turbo = caf->frequency;
-//            printf("fcf: turbo %lu\n", freq_turbo);
-        } else {
+#ifdef VERBOSE
+            printf("fcf: turbo %lu\n", freq_turbo);
+#endif            
+        }
+        else {
             if (caf->frequency > max_frequency) {
                 max_frequency = caf->frequency;
             }
             freq_gcd = gcd(freq_gcd, caf->frequency);
-//            printf("fcf: freq %lu, gcd %lu\n", caf->frequency, freq_gcd);
+#ifdef VERBOSE
+            printf("fcf: freq %lu, gcd %lu\n", caf->frequency, freq_gcd);
+#endif
         }
     }
     num_freq_bins = 1 + (max_frequency / freq_gcd);
-//    printf("fcf: detected %zu frequency bins (gdc %lu) with maximum of %lu and %lu turbo\n",
-//           num_freq_bins, freq_gcd, max_frequency, freq_turbo);
+#ifdef VERBOSE
+    printf("fcf: detected %zu frequency bins (gdc %lu) with maximum of %lu and %lu turbo\n", num_freq_bins, freq_gcd, max_frequency, freq_turbo);
+#endif
     freq_lenstr_map = calloc(num_freq_bins, sizeof(*freq_lenstr_map));
     assert(freq_lenstr_map);
     for (caf = caf_first; caf != NULL; caf = caf->next) {
@@ -152,14 +179,18 @@ long fcf_set_frequency(unsigned int cpu, unsigned long target_frequency) {
 
     const int fd     = freq_get_fd(cpu);
     const lenstr* ls = freq_get_lenstr(target_frequency);
-//    fprintf(stderr,"Setting frequency to %li %s!\n",target_frequency,ls->str);
+#ifdef VERBOSE
+    fprintf(stderr,"Setting frequency to %li %s!\n",target_frequency,ls->str);
+#endif
     const ssize_t ret    = pwrite(fd, ls->str, ls->len, 0);
     if (ret != (ssize_t)ls->len) {
         fprintf(stderr, "libadapt ERROR: Failed to set frequency for cpu %d to %lu/'%s' (%zu): %s\n", cpu, target_frequency, ls->str, ls->len, strerror(errno));
         return -1;
     }
     freq_settings[cpu] = target_frequency;
-    //fprintf(stderr,"Return %li!\n",target_frequency);
+#ifdef VERBOSE
+    fprintf(stderr,"Return %li!\n",target_frequency);
+#endif
     return target_frequency;
 }
 
@@ -172,9 +203,15 @@ int fcf_init_once() {
     }
     called = 1;
     
-    /* TODO: what to do with broken setups, e.g., the Haswell platform, where CPUs are not continuously numbered? */
+    /* TODO: what to do with broken setups, e.g. the Haswell platform, 
+     * where CPUs are not continuously numbered?
+     *
+     * Possible solution to parse /proc/cpuinfo
+     * No Computer with discontinously cpu numbers found */
     num_cpus = sysconf(_SC_NPROCESSORS_CONF);
     for (unsigned cpu = 0; cpu < num_cpus; cpu++) {
+        /* Missing cpu numbers are no problem for 
+         * cpufreq_modify_policy_governor */
         ret = cpufreq_modify_policy_governor(cpu, "userspace");
         if (ret)
           return ret;

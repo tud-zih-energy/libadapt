@@ -1,3 +1,22 @@
+/***********************************************************************
+ * Copyright (c) 2010-2016 Technische Universitaet Dresden             *
+ *                                                                     *
+ * This file is part of libadapt.                                      *
+ *                                                                     *
+ * libadapt is free software: you can redistribute it and/or modify    *
+ * it under the terms of the GNU General Public License as published by*
+ * the Free Software Foundation, either version 3 of the License, or   *
+ * (at your option) any later version.                                 *
+ *                                                                     *
+ * This program is distributed in the hope that it will be useful,     *
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ * GNU General Public License for more details.                        *
+ *                                                                     *
+ * You should have received a copy of the GNU General Public License   *
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.*
+ ***********************************************************************/
+
 #include "c_state_limit.h"
 
 #include <dirent.h>
@@ -37,13 +56,13 @@ int csl_init(void) {
   /* get number of CPUs */
   num_cpus = sysconf(_SC_NPROCESSORS_CONF);
 
-  per_cpu_cstates=malloc(num_cpus*sizeof(struct per_cpu));
+  /* calloc is a lot faster than malloc + memset */
+  per_cpu_cstates = calloc(num_cpus, sizeof(struct per_cpu));
   /* alloc ok? */
-  if (per_cpu_cstates==NULL)
+  if (per_cpu_cstates == NULL)
   {
     return ENOMEM;
   }
-  memset(per_cpu_cstates,0,sizeof(struct per_cpu));
 
   nr_per_cpu_cstates=num_cpus;
 
@@ -61,10 +80,13 @@ int csl_init(void) {
       return ENOMEM;
     }
 
-    /* TODO error handling for scandir */
+    /* get array with all possibile states */
     int number_cpuidle_files = scandir(path_string, &namelist, NULL, alphasort);
-    if (number_cpuidle_files <= 0)
+    /* scandir return -1 if someting went wrong */
+    /* namelist shouldn't be a NULL Pointer */
+    if (number_cpuidle_files <= 0 && namelist == NULL)
     {
+      /* if we are here something went wrong */
       free(per_cpu_cstates);
       return EPERM;
     }
@@ -78,6 +100,10 @@ int csl_init(void) {
         /* allocate space for state information*/
         if (per_cpu_cstates[current_cpu].nr_cstates < (state_id + 1)){
           per_cpu_cstates[current_cpu].c_state_files=realloc(per_cpu_cstates[current_cpu].c_state_files,(state_id+1)*sizeof(struct c_state_file));
+          if (per_cpu_cstates[current_cpu].c_state_files == NULL)
+              /* not enough space for an integer?
+               * so we schould break here */
+              return ENOMEM;
           per_cpu_cstates[current_cpu].nr_cstates=state_id;
         }
 

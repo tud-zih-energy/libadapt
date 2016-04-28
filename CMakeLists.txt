@@ -18,6 +18,11 @@ project(adapt)
 # Disable x86 adapt kernel module interaction
 # -DNO_X86_ADAPT=On
 
+# Set a default build type if none was specified
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "Setting build type to 'Release' as none was specified.")
+   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+endif()
 
 # You may give this option ...
 option(CFG_DIR "Path to include/libconfig.h and lib/libconfig.so")
@@ -50,7 +55,9 @@ set(CMAKE_C_FLAGS_DEBUG "-O0 -g -std=c99")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -std=c99")
 
 #shared c flags among build types
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=c99 -D_POSIX_C_SOURCE -D_BSD_SOURCE -D_GNU_SOURCE")
+#define _DEFAULT_SOURCE when defining _BSD_SOURCE to avoid compiler
+#warnings for glibc later than 2.20
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=c99 -D_POSIX_C_SOURCE -D_BSD_SOURCE -D_DEFAULT_SOURCE -D_GNU_SOURCE")
 
 #add all .c files
 unset(SOURCES CACHE)
