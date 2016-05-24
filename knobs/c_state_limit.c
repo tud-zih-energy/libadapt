@@ -149,7 +149,7 @@ int csl_init(void) {
 }
 
 static inline int set_max_cstate(int cpu, int state){
-  if ( ( state > per_cpu_cstates[cpu].nr_cstates ) || ( state < 0 ) || ( cpu < 0 ) || ( cpu > nr_per_cpu_cstates) )
+  if ( ( cpu < 0 ) || ( cpu > nr_per_cpu_cstates) || ( state > per_cpu_cstates[cpu].nr_cstates ) || ( state < 0 ) )
     return EINVAL;
 
   if ( state > per_cpu_cstates[cpu].current_max ){
