@@ -178,6 +178,9 @@ static inline int set_max_cstate(int cpu, int state){
 
   }
   /* if state == per_cpu_cstates[cpu].current_max do nothing :) */
+  
+  per_cpu_cstates[cpu].current_max = state;
+
   return 0;
 }
 
