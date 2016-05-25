@@ -109,7 +109,7 @@ int csl_init(void) {
 
         /* now open the "disabled" file and store its value */
 
-        nr_chars = snprintf(path_string,256,"/sys/devices/system/cpu/cpu%d/cpuidle/state%d/disabled",current_cpu,state_id);
+        nr_chars = snprintf(path_string,256,"/sys/devices/system/cpu/cpu%d/cpuidle/state%d/disable",current_cpu,state_id);
 
         if (nr_chars >= 256)
         {
