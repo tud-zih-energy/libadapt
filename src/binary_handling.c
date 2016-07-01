@@ -39,9 +39,9 @@ static size_t adapt_information_size;
  * static function would be nicer but is not possible for different
  * structures 
  * */
-#define FREE_LIST(current_ptr) \
+#define FREE_LIST(TYPE, current_ptr) \
     if (current_ptr->next){ \
-        __auto_type next_ptr = current_ptr; \
+        TYPE next_ptr = current_ptr; \
         current_ptr = current_ptr->next; \
         FREE_AND_NULL(next_ptr);\
         while(current_ptr->next){ \
@@ -294,17 +294,17 @@ int free_hashmaps(void)
         if ((&c2conf_hashmap[i]) != NULL)
         {
             struct crid_to_config_struct * current=&c2conf_hashmap[i];
-            FREE_LIST(current);
+            FREE_LIST(struct crid_to_config_struct *,current);
         }
         if ((&r2c_hashmap[i]) != NULL)
         {
             struct rid_to_crid_struct * current=&r2c_hashmap[i];
-            FREE_LIST(current);
+            FREE_LIST(struct rid_to_crid_struct *,current);
         }
         if ((&bids_hashmap[i]) != NULL)
         {
             struct added_binary_ids_struct * current=&bids_hashmap[i];
-            FREE_LIST(current);
+            FREE_LIST(struct added_binary_ids_struct *,current);
         }
     }
     FREE_AND_NULL(c2conf_hashmap);
