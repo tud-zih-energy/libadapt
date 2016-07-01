@@ -3,7 +3,7 @@ install:
   - sudo apt-get update -qq
   - sudo apt-get install -y -qq libcpufreq-dev libconfig8-dev linux-headers-generic
   - git clone https://github.com/tud-zih-energy/x86_adapt.git
-  - cd x86_adapt-master
+  - cd x86_adapt
   - mkdir build && cd build && cmake .. && cmake --build .
 script:
 - mkdir build && cd build && cmake -DNO_X86_ADAPT=ON -DCMAKE_BUILD_TYPE=Debug .. && cmake --build .
