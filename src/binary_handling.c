@@ -39,11 +39,15 @@ static size_t adapt_information_size;
  * static function would be nicer but is not possible for different
  * structures 
  * */
+/* remove following line
+ * FREE_AND_NULL(next_ptr);\
+ * because with this the following error happens:
+ * free(): invalid pointer
+ * */
 #define FREE_LIST(TYPE, current_ptr) \
     if (current_ptr->next){ \
         TYPE next_ptr = current_ptr; \
         current_ptr = current_ptr->next; \
-        FREE_AND_NULL(next_ptr);\
         while(current_ptr->next){ \
             next_ptr = current_ptr->next; \
             FREE_AND_NULL(current_ptr); \
