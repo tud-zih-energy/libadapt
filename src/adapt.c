@@ -559,6 +559,9 @@ void adapt_close()
 
   /* free the hashmaps */
   /* if the work was already done by another thread, we have nothing to do */
+#ifdef VERBOSE
+  fprintf(error_stream, "Free hashmaps. \n");
+#endif
   if (free_hashmaps() == 0)
       return;
   
@@ -585,6 +588,7 @@ void adapt_close()
     /* apply initial setting for current cpu
      * we want to exit so we set the switch to 1 */
 #ifdef VERBOSE
+    fprintf(error_stream, "Applying initial settings for current cpu. \n");
     int ok = knobs_loop(init_infos, 1, sched_getcpu());
 #else
     knobs_loop(init_infos, 1, sched_getcpu());
@@ -595,6 +599,9 @@ void adapt_close()
   printf(error_stream, "Status of applying initial infos at closing: %d\n", ok)
 #endif
 
+#ifdef VERBOSE
+  fprintf(error_stream, "Execute the fini() function of the knobs. \n");
+#endif
   for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
   {
     if (knobs[knob_index].fini)
