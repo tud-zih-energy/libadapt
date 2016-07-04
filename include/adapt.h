@@ -151,8 +151,8 @@
  *
  */
 
-#include <stdint.h>
-
+/* #include <stdint.h> */
+#include <inttypes.h>
 
 #define ADAPT_OK                  0
 #define ADAPT_NO_ACTUAL_ADAPT     1
