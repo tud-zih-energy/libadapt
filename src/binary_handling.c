@@ -39,25 +39,26 @@ static size_t adapt_information_size;
  * static function would be nicer but is not possible for different
  * structures 
  * */
-/* remove following line
- * FREE_AND_NULL(next_ptr);\
- * because with this the following error happens:
- * free(): invalid pointer
+
+/* calloc() together so free() together, never forget
+ * hashmaps are allocated togother so it's only possible to free them together
+ * free() the passed current_ptr would be a bad idea
  * */
 #define FREE_LIST(TYPE, current_ptr) \
-    if (current_ptr->next){ \
-        TYPE next_ptr = current_ptr; \
-        current_ptr = current_ptr->next; \
-        while(current_ptr->next){ \
-            next_ptr = current_ptr->next; \
+    if (current_ptr){ \
+        if (current_ptr->next){ \
+            TYPE next_ptr = current_ptr; \
+            current_ptr = current_ptr->next; \
+            while(current_ptr->next){ \
+                next_ptr = current_ptr->next; \
+                FREE_AND_NULL(current_ptr); \
+                current_ptr = next_ptr; \
+            } \
             FREE_AND_NULL(current_ptr); \
-            current_ptr = next_ptr; \
         } \
-        FREE_AND_NULL(current_ptr); \
     }
 
-
-/* unsusable stuff in the case that not enough memory is avaible 
+/* remove unsusable stuff in the case that not enough memory is avaible 
  * */
 #define CHECK_INIT_MALLOC_HASHMAPS(a) if( (a) == NULL) { \
     CHECK_INIT_MALLOC_FREE(c2conf_hashmap); \
