@@ -301,7 +301,7 @@ uint64_t adapt_add_binary(char * binary_name)
   if (set)
   {
 #ifdef VERBOSE
-      fprintf(error_stream,"binary %s %llu %llu provides default values %d\n",binary_name,binary_id,get_id(binary_name),is_binary_id_used(binary_id));
+      fprintf(error_stream,"binary %s %" PRIu64 " %" PRIu64 " provides default values %d\n",binary_name,binary_id,get_id(binary_name),is_binary_id_used(binary_id));
 #endif
     /* mark binary_id as used if there any setting */
     set_binary_id_used(binary_id,1);
@@ -348,7 +348,7 @@ uint64_t adapt_add_binary(char * binary_name)
     {
 
 #ifdef VERBOSE
-      fprintf(error_stream,"ending after %d checks for function information, %d %llx\n",function_id_in_cfg_file,is_binary_id_used(binary_id),binary_id);
+      fprintf(error_stream,"ending after %d checks for function information, %d %" PRIu64 "\n",function_id_in_cfg_file,is_binary_id_used(binary_id),binary_id);
 #endif
       break;
     }
@@ -428,9 +428,9 @@ static int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,in
   {
 #ifdef VERBOSE
     if (!exit)
-        fprintf(error_stream,"Binary not used %llu, applying defaults\n",binary_id);
+        fprintf(error_stream,"Binary not used %" PRIu64 ", applying defaults\n",binary_id);
     else
-        fprintf(error_stream,"Binary not used %llu, exit defaults\n",binary_id);
+        fprintf(error_stream,"Binary not used %" PRIu64 ", exit defaults\n",binary_id);
 #endif
     if (default_infos)
     {
