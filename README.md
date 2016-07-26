@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/rschoene/libadapt.png)](https://travis-ci.org/rschoene/libadapt)
+[![Build Status](https://travis-ci.org/tud-zih-energy/libadapt.png)](https://travis-ci.org/tud-zih-energy/libadapt)
 
 # libadapt
 libadapt can be used to change the hardware and software environment when certain executables are started or funtions are entered/exited. libadapt supports different types of knobs, e.g., cpu frequency scaling, concurrency throttling, hardware settings via x86_adapt and file writes.
