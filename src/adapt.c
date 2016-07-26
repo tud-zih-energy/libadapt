@@ -29,7 +29,7 @@
 #include "adapt_internal.h"
 #include "binary_handling.h"
 
-// #define VERBOSE 1
+#define VERBOSE 1
 
 
 /* Check if the given value is zero or not and return the
@@ -301,7 +301,7 @@ uint64_t adapt_add_binary(char * binary_name)
   if (set)
   {
 #ifdef VERBOSE
-      fprintf(error_stream,"binary %s %llu %llu provides default values %d\n",binary_name,binary_id,get_id(binary_name),is_binary_id_used(binary_id));
+      fprintf(error_stream,"binary %s %" PRIu64 " %" PRIu64 " provides default values %d\n",binary_name,binary_id,get_id(binary_name),is_binary_id_used(binary_id));
 #endif
     /* mark binary_id as used if there any setting */
     set_binary_id_used(binary_id,1);
@@ -327,7 +327,7 @@ uint64_t adapt_add_binary(char * binary_name)
       crid = get_id(function_name_in_cfg);
 
 #ifdef VERBOSE
-      fprintf(error_stream,"Function definition:%s/%s %s %lu %lu %llu\n",binary_name_in_cfg,binary_name,function_name_in_cfg,binary_id_in_cfg_file, function_id_in_cfg_file,crid);
+      fprintf(error_stream,"Function definition:%s/%s %s %" PRIu32 " %" PRIu32 " %" PRIu64 "\n",binary_name_in_cfg,binary_name,function_name_in_cfg,binary_id_in_cfg_file, function_id_in_cfg_file,crid);
 #endif
 
       for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
@@ -348,7 +348,7 @@ uint64_t adapt_add_binary(char * binary_name)
     {
 
 #ifdef VERBOSE
-      fprintf(error_stream,"ending after %d checks for function information, %d %llx\n",function_id_in_cfg_file,is_binary_id_used(binary_id),binary_id);
+      fprintf(error_stream,"ending after %d checks for function information, %d %" PRIu64 "\n",function_id_in_cfg_file,is_binary_id_used(binary_id),binary_id);
 #endif
       break;
     }
@@ -377,7 +377,7 @@ int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid)
      */
     crid = get_id(rname);
 #ifdef VERBOSE
-    fprintf(error_stream,"Add Function definition:%s %llu %lu\n",rname,crid,rid);
+    fprintf(error_stream,"Add Function definition:%s %" PRIu64 " %" PRIu32 "\n", rname, crid, rid);
 #endif
     return add_rid2crid(binary_id,rid,crid);
   }
@@ -428,9 +428,9 @@ static int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,in
   {
 #ifdef VERBOSE
     if (!exit)
-        fprintf(error_stream,"Binary not used %llu, applying defaults\n",binary_id);
+        fprintf(error_stream,"Binary not used %" PRIu64 ", applying defaults\n",binary_id);
     else
-        fprintf(error_stream,"Binary not used %llu, exit defaults\n",binary_id);
+        fprintf(error_stream,"Binary not used %" PRIu64 ", exit defaults\n",binary_id);
 #endif
     if (default_infos)
     {
@@ -478,12 +478,12 @@ static int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,in
     if (!exit)
     {
         if (stack_on)
-            fprintf(error_stream,"Enter %llu %lu %lu %lu\n",binary_id, tid, function_stack_sizes[tid], rid);
+            fprintf(error_stream, "Enter %" PRIu64 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n", binary_id, tid, function_stack_sizes[tid], rid);
         else
-            fprintf(error_stream,"Enter %llu %lu\n",binary_id, rid);
+            fprintf(error_stream, "Enter %" PRIu64 " %" PRIu32 "\n", binary_id, rid);
     }
     else
-        fprintf(error_stream,"Exit %llu %lu %lu %lu \n",binary_id tid, function_stack_sizes[tid], rid);
+        fprintf(error_stream, "Enter %" PRIu64 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n", binary_id, tid, function_stack_sizes[tid], rid);
 #endif
     /* get the constant region id */
     struct rid_to_crid_struct * r2d = get_rid2crid(binary_id, rid);
@@ -492,7 +492,7 @@ static int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,in
     if (r2d != NULL)
     {
 #ifdef VERBOSE
-        fprintf(error_stream,"Crid %lu %llu\n", r2d->rid, r2d->crid);
+        fprintf(error_stream,"Crid %" PRIu32 " %" PRIu64 "\n", r2d->rid, r2d->crid);
 #endif
         /* do adapt */
         ok = knobs_loop(r2d->infos, exit, cpu);
@@ -559,12 +559,18 @@ void adapt_close()
 
   /* free the hashmaps */
   /* if the work was already done by another thread, we have nothing to do */
+#ifdef VERBOSE
+  fprintf(error_stream, "Free hashmaps. \n");
+#endif
   if (free_hashmaps() == 0)
       return;
   
   /* first look if the work was done by another thread */
   if (function_stacks != NULL)
   {
+#ifdef VERBOSE
+    fprintf(error_stream, "Entering part to free function stacks. \n");
+#endif
     uint32_t ** tmp = function_stacks;
     /* make closing ready for threads
     * for free the function_stack use another pointer */
@@ -585,16 +591,17 @@ void adapt_close()
     /* apply initial setting for current cpu
      * we want to exit so we set the switch to 1 */
 #ifdef VERBOSE
+    fprintf(error_stream, "Applying initial settings for current cpu. \n");
     int ok = knobs_loop(init_infos, 1, sched_getcpu());
+    fprintf(error_stream, "Status of applying initial infos at closing: %d\n", ok);
 #else
     knobs_loop(init_infos, 1, sched_getcpu());
 #endif
   }
 
 #ifdef VERBOSE
-  printf(error_stream, "Status of applying initial infos at closing: %d\n", ok)
+  fprintf(error_stream, "Execute the fini() function of the knobs. \n");
 #endif
-
   for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
   {
     if (knobs[knob_index].fini)
