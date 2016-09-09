@@ -37,7 +37,7 @@
 #include <string.h>
 #include <errno.h>
 
-/*#define VERBOSE 1 */
+#define VERBOSE 1
 
 static unsigned int num_cpus = 0;
 
@@ -74,9 +74,9 @@ static int restore_before_settings() {
 }
 
 
-static long dvfs_set_freq(int64_t frequency, int32_t cpu) {
+static long dvfs_set_freq(int32_t frequency, int32_t cpu) {
 #ifdef VERBOSE
-    fprintf(stderr,"adapting 1 frequency to %d %d\n",frequency, cpu);
+    fprintf(stderr,"adapting 1 frequency to %" PRId32 " %" PRId32 "\n",frequency, cpu);
 #endif
     assert(frequency);
     if (cpu < 0) {
@@ -116,7 +116,7 @@ int dvfs_read_from_config(void * vp, struct config_t * cfg, char * buffer,
   if (setting) {
     info->freq_before = config_setting_get_int(setting);
 #ifdef VERBOSE
-    fprintf(stderr,"%s = %d \n",buffer,info->freq_before);
+    fprintf(stderr,"%s = %" PRId32 "\n",buffer,info->freq_before);
 #endif
     was_set = 1;
   }
@@ -125,7 +125,7 @@ int dvfs_read_from_config(void * vp, struct config_t * cfg, char * buffer,
   if (setting) {
     info->freq_after = config_setting_get_int(setting);
 #ifdef VERBOSE
-    fprintf(stderr,"%s = %d \n",buffer,info->freq_after);
+    fprintf(stderr,"%s = %" PRId32 "\n",buffer,info->freq_after);
 #endif
     was_set = 1;
   }
@@ -140,7 +140,7 @@ int dvfs_process_before(void * vp, int32_t cpu) {
   }
 
 #ifdef VERBOSE
-  fprintf(stderr,"adapting frequency to %d\n",info->freq_before);
+  fprintf(stderr,"adapting frequency to %" PRId32 "\n",info->freq_before);
 #endif
 
   ok = dvfs_set_freq(info->freq_before, cpu);
@@ -159,7 +159,7 @@ int dvfs_process_after(void * vp, int32_t cpu) {
     return 0;
   }
 #ifdef VERBOSE
-  fprintf(stderr,"adapting frequency to %d\n",info->freq_after);
+  fprintf(stderr,"adapting frequency to %" PRId32 "\n",info->freq_after);
 #endif
   ok = dvfs_set_freq(info->freq_after, cpu);
 
