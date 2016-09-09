@@ -146,6 +146,11 @@ int adapt_open()
   if (!config_read_file(&cfg, file_name))
   {
     fprintf(error_stream, "reading config file %s failed\n", file_name);
+    fprintf(error_stream, "Informations from libconfig:\n");
+    fprintf(error_stream, "File: %d\n", config_error_type(&cfg));
+    fprintf(error_stream, "File: %s\n", config_error_file(&cfg));
+    fprintf(error_stream, "Line: %d\n", config_error_line(&cfg));
+    fprintf(error_stream, "Text: %s\n", config_error_text(&cfg));
     return 1;
   }
 
@@ -478,12 +483,12 @@ static int adapt_enter_or_exit(uint64_t binary_id, uint32_t tid, uint32_t rid,in
     if (!exit)
     {
         if (stack_on)
-            fprintf(error_stream, "Enter %" PRIu64 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n", binary_id, tid, function_stack_sizes[tid], rid);
+            fprintf(error_stream, "Enter with stacks %" PRIu64 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n", binary_id, tid, function_stack_sizes[tid], rid);
         else
             fprintf(error_stream, "Enter %" PRIu64 " %" PRIu32 "\n", binary_id, rid);
     }
     else
-        fprintf(error_stream, "Enter %" PRIu64 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n", binary_id, tid, function_stack_sizes[tid], rid);
+        fprintf(error_stream, "Enter for exit %" PRIu64 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n", binary_id, tid, function_stack_sizes[tid], rid);
 #endif
     /* get the constant region id */
     struct rid_to_crid_struct * r2d = get_rid2crid(binary_id, rid);
