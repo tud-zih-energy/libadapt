@@ -27,6 +27,8 @@
 
 #include <string.h>
 
+#define VERBOSE 1
+
 /* if realloc fail something is particular fail 
  * but we're going on and process the settings there fit in the memory
  * */
@@ -99,7 +101,8 @@ int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char *
       else
         info->value_after[i]=NULL;
 
-    } else
+    }
+    else
       break;
 
   }
@@ -115,6 +118,9 @@ int file_process_before(void * vp, int ignored){
   for (i=0;i<info->nr_files;i++){
     if (info->value_before[i]!=NULL){
       if(write(info->fd[i],info->value_before[i],info->value_before_len[i]) != info->value_before_len[i]) {
+#ifdef VERBOSE
+        fprintf(stderr, "Writing before process failed for file %s\n", *(info->filename));
+#endif
         return 1;
       }
     }
@@ -129,8 +135,12 @@ int file_process_after(void * vp, int ignored){
 
   for (i=0;i<info->nr_files;i++){
     if (info->value_after[i]!=NULL){
-      if (write(info->fd[i],info->value_after[i],info->value_after_len[i]) != info->value_after_len[i])
+      if (write(info->fd[i],info->value_after[i],info->value_after_len[i]) != info->value_after_len[i]) {
+#ifdef VERBOSE
+        fprintf(stderr, "Writing before process failed for file %s\n", *(info->filename));
+#endif
         return 1;
+      }
     }
   }
   return 0;
