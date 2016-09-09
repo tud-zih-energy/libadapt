@@ -29,10 +29,10 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 
-/*#define VERBOSE 1 */
+#define VERBOSE 1 
 
 /* give us the status of dct */
-static int dct_enabled=0;
+static int dct_enabled = 0;
 /* give us the number of threads that was last set by
  * omp_dct_set_num_threads */
 static int last_set_threads = 0;
@@ -202,6 +202,9 @@ int init_dct_information(){
     return 1;
   }
   load_omp_lib();
+#ifdef VERBOSE
+  fprintf(stderr, "Load OpenMP libary \n");
+#endif
   return 0;
 }
 
@@ -218,14 +221,20 @@ int dct_read_from_config(void * vp,struct config_t * cfg, char * buffer, char * 
   sprintf(buffer, "%s.%s_threads_before",
       prefix, DCT_CONFIG_STRING);
   setting = config_lookup(cfg, buffer);
-  if (setting){
+  if (setting)
+  {
     /* set variable to value in config */
     info->threads_before = config_setting_get_int(setting);
+#ifdef VERBOSE
+    fprintf(stderr, "%s = %" PRId32 "\n",buffer,info->threads_before);
+#endif
     if (info->threads_before == 0)
       /* by zero no config option was found */
       info->threads_before=initial_num_threads;
     dct_enabled = 1;
-  } else {
+  }
+  else
+  {
       /* without a setting,set it to the default value */
       info->threads_before = -1;
   }
@@ -233,16 +242,26 @@ int dct_read_from_config(void * vp,struct config_t * cfg, char * buffer, char * 
   sprintf(buffer, "%s.%s_threads_after",
       prefix, DCT_CONFIG_STRING);
   setting = config_lookup(cfg, buffer);
-  if (setting){
+  if (setting)
+  {
     info->threads_after = config_setting_get_int(setting);
+#ifdef VERBOSE
+    fprintf(stderr, "%s = %" PRId32 "\n",buffer,info->threads_after);
+#endif
     if (info->threads_after==0)
       info->threads_after=initial_num_threads;
     dct_enabled=1;
-  } else {
+  }
+  else
+  {
       info->threads_after = -1;
   }
+
   if (dct_enabled)
   {
+#ifdef VERBOSE
+    fprintf(stderr, "Enable DCT and disable original dynamic \n");
+#endif
     /* disable dynamic from omp becasue we want to use our
      * implementation */
     omp_set_dynamic_orig(0);
@@ -259,10 +278,14 @@ int dct_process_before(void * vp,int ignore){
     if (info->threads_before > 0) {
         /* then we get a number of threads from the config so use it */
 #ifdef VERBOSE
-      fprintf(stderr,"adapting threads to %d\n",info->threads_before);
+      fprintf(stderr,"Adapting threads before to %d\n",info->threads_before);
 #endif
       omp_dct_set_num_threads(info->threads_before);
     }
+#ifdef VERBOSE
+  if ( !dct_enabled )
+    fprintf(stderr, "DCT not enabled for setting before \n");
+#endif
   return 0;
 }
 
@@ -271,15 +294,18 @@ int dct_process_after(void * vp,int ignore){
   struct dct_information * info = vp;
   if (dct_enabled)
     if (info->threads_after > 0) {
-
 #ifdef VERBOSE
-      fprintf(stderr,"adapting threads to %d\n",info->threads_after);
+      fprintf(stderr,"Adapting threads after to %d\n",info->threads_after);
 #endif
       omp_dct_set_num_threads(info->threads_after);
       /* set last_exit_threads to the number of the latest change of the
        * threads afterwards */
       last_exit_threads=info->threads_after;
     }
+#ifdef VERBOSE
+  if ( !dct_enabled )
+    fprintf(stderr, "DCT not enabled for setting after \n");
+#endif
   return 0;
 }
 
