@@ -17,6 +17,8 @@ project(adapt)
 # -DNO_CPUFREQ=On
 # Disable x86 adapt kernel module interaction
 # -DNO_X86_ADAPT=On
+# Disabel C-state limit changing
+# -DNO_CSL=On
 
 # Set a default build type if none was specified
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -48,8 +50,11 @@ option(NO_X86_ADAPT "Disable x86_adapt kernel module support")
 # Disable cpu frequency changing
 option(NO_CPUFREQ "Disable cpu frequency changing")
 
+# Disable C-state limit changing
+option(NO_CPUFREQ "Disable C-state limit changing")
+
 #debug c flags
-set(CMAKE_C_FLAGS_DEBUG "-O0 -g -std=c99")
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g -std=c99 -D VERBOSE")
 
 #release c flags
 set(CMAKE_C_FLAGS_RELEASE "-O3 -std=c99")
@@ -81,6 +86,12 @@ if(${NO_CPUFREQ})
     list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/knobs/fastcpufreq.h")
 	message(STATUS "cpufreq disabled")
 endif(${NO_CPUFREQ})
+
+if(${NO_CSL})
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNO_CSL")
+    list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/knobs/c_state_limit.c")
+    list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/knobs/c_state_limit.h")
+endif(${NO_CSL})
 
 unset(INCTMP CACHE)
 find_path(INCTMP execinfo.h)
