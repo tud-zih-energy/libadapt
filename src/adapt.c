@@ -29,14 +29,12 @@
 #include "adapt_internal.h"
 #include "binary_handling.h"
 
-#define VERBOSE 1
-
 
 /* Check if the given value is zero or not and return the
  * correspondeding ADAPT_STATUS 
  * */
 #define RETURN_ADAPT_STATUS(settings) \
-    if (settings) \
+    if (!settings) \
         return ADAPT_OK; \
     else \
         return ADAPT_ERROR_WHILE_ADAPT;
@@ -104,32 +102,50 @@ static int knobs_loop(char * settings, int exit, int32_t cpu )
 {
   int i;
   int ok = 0;
+
+#ifdef VERBOSE
+  if (!exit)
+    fprintf(error_stream, "Process: enter\n");
+  else
+    fprintf(error_stream, "Process: exit\n");
+#endif
+
   for (i = 0; i < ADAPT_MAX; i++ )
   {
     if (!exit)
     {
       if (knobs[i].process_before)
+      {
         ok |=knobs[i].process_before(&(settings[knob_offsets[i]]),cpu);
+#ifdef VERBOSE
+        fprintf(error_stream, "Knob: %d \t Status(Bitwise inclusive): %d\n", i, ok);
+#endif
+      }
     }
     else
     {
       if (knobs[i].process_after)
+      {
         ok |= knobs[i].process_after(&(settings[knob_offsets[i]]),cpu);
+#ifdef VERBOSE
+        fprintf(error_stream, "Knob: %d \t Status(Bitwise inclusive): %d\n", i, ok);
+#endif
+      }
     }
   }
-  /* give the status of the processes back */
+
   return ok;
 }
 
 int adapt_open()
 {
   char *file_name;
-  char * prefix_default="default";
-  char * prefix_init="init";
+  char * prefix_default = "default";
+  char * prefix_init = "init";
   char buffer[1024];
   config_setting_t *setting = NULL;
-  int set_default=0,set_init=0;
-  uint32_t hash_set_size=0;
+  int ok = 0, set_default = 0, set_init = 0;
+  uint32_t hash_set_size = 0;
 
   error_stream = stderr;
 
@@ -214,7 +230,7 @@ int adapt_open()
   /* get inits and defaults and apply inits */
   for (knob_index = 0; knob_index < ADAPT_MAX; knob_index++ )
   {
-    set_init=0;
+    set_init = 0;
     if (knobs[knob_index].read_from_config)
     {
       set_default |= knobs[knob_index].read_from_config(&(default_infos[knob_offsets[knob_index]]),&cfg,buffer,prefix_default);
@@ -225,8 +241,13 @@ int adapt_open()
       {
         if (knobs[knob_index].process_before)
           /* apply setting for initialize for the current cpu */
-          knobs[knob_index].process_before(&(init_infos[knob_offsets[knob_index]]),sched_getcpu());
+          ok |= knobs[knob_index].process_before(&(init_infos[knob_offsets[knob_index]]),sched_getcpu());
       }
+
+#ifdef VERBOSE
+      fprintf(error_stream, "Knob: %d \t Read defaults(Bitwise inclusive): %d \t Read inits: %d \t \
+          Status inits(Bitwise inclusive): %d\n", knob_index, set_default, set_init, ok);
+#endif
     }
   }
 
@@ -235,7 +256,7 @@ int adapt_open()
     FREE_AND_NULL(default_infos);
   }
 
-  return 0;
+  RETURN_ADAPT_STATUS(ok);
 }
 
 uint64_t adapt_add_binary(char * binary_name)
@@ -371,7 +392,12 @@ int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid)
   }
 
   if (!is_binary_id_used(binary_id))
+  {
+#ifdef VERBOSE
+    fprintf(error_stream,"For Region: %s Binary %" PRIu64 "is not used\n", rname, binary_id);
+#endif
       return 1;
+  }
 
   /* if it is not already registered */
   if (get_rid2crid(binary_id, rid) == NULL)
@@ -382,10 +408,13 @@ int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid)
      */
     crid = get_id(rname);
 #ifdef VERBOSE
-    fprintf(error_stream,"Add Function definition:%s %" PRIu64 " %" PRIu32 "\n", rname, crid, rid);
+    fprintf(error_stream,"Add Function definition: %s %" PRIu64 " %" PRIu32 "\n", rname, crid, rid);
 #endif
     return add_rid2crid(binary_id,rid,crid);
   }
+#ifdef VERBOSE
+  fprintf(error_stream,"For Region: %s RID %" PRIu32 "is already registered\n");
+#endif
   return 1;
 }
 

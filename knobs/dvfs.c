@@ -37,7 +37,6 @@
 #include <string.h>
 #include <errno.h>
 
-#define VERBOSE 1
 
 static unsigned int num_cpus = 0;
 
@@ -64,9 +63,9 @@ static int save_before_settings(void) {
 static int restore_before_settings() {
     for (int cpu = 0; cpu < num_cpus; cpu++) {
         int ret;
-        if ((ret = cpufreq_set_policy(cpu, saved_policies[cpu]))) {
+        if ( ret = cpufreq_set_policy(cpu, saved_policies[cpu]) )
             return ret;
-        }
+
         cpufreq_put_policy(saved_policies[cpu]);
     }
     free(saved_policies);
@@ -97,11 +96,11 @@ int init_dvfs() {
 }
 
 int fini_dvfs() {
-    fcf_finalize();
-    if (saved_policies) {
-        restore_before_settings(-1);
-    }
-    return 0;
+  fcf_finalize();
+  if (saved_policies) {
+    restore_before_settings();
+  }
+  return 0;
 }
 
 int dvfs_read_from_config(void * vp, struct config_t * cfg, char * buffer, 
