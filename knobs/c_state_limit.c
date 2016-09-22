@@ -197,7 +197,7 @@ int csl_read_from_config(void * vp,struct config_t * cfg, char * buffer, char * 
   if (setting) {
     info->csl_before = config_setting_get_int(setting);
 #ifdef VERBOSE
-    fprintf(stderr,"%s = %d \n",buffer,info->freq_before);
+    fprintf(stderr,"%s = %d \n",buffer,info->csl_before);
 #endif
     was_set = 1;
   }
@@ -206,7 +206,7 @@ int csl_read_from_config(void * vp,struct config_t * cfg, char * buffer, char * 
   if (setting) {
     info->csl_after = config_setting_get_int(setting);
 #ifdef VERBOSE
-    fprintf(stderr,"%s = %d \n",buffer,info->freq_after);
+    fprintf(stderr,"%s = %d \n",buffer,info->csl_after);
 #endif
     was_set = 1;
   }

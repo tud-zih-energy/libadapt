@@ -1,9 +1,11 @@
 language: c
+sudo: required
 install:
   - sudo apt-get update -qq
-  - sudo apt-get install -y -qq libcpufreq-dev libconfig8-dev
+  - sudo apt-get install -y -qq libcpufreq-dev libconfig8-dev linux-headers-$(uname -r)
 script:
-- git clone https://github.com/tud-zih-energy/x86_adapt.git
-- cd x86_adapt
-- mkdir build && cd build && cmake -DNO_KERNEL_DRIVER=On .. && cmake --build . && pwd && cd ../.. && pwd
-- PWDX=`pwd` && mkdir build && cd build && cmake -DXA_INC=$PWDX/x86_adapt/library/include -DXA_LIB=$PWDX/x86_adapt/build/ -DCMAKE_BUILD_TYPE=Debug .. && cmake --build .
+  - git clone https://github.com/tud-zih-energy/x86_adapt.git
+  # - cd x86_adapt && mkdir build && cd build && cmake -DNO_KERNEL_DRIVER=On .. && cmake --build . && cd ../..
+  - cd x86_adapt && mkdir build && cd build && cmake .. && cmake --build . && sudo insmod kernel_module/definition_driver/x86_adapt_defs.ko && sudo insmod kernel_module/driver/x86_adapt_driver.ko && cd ../..
+  - PWDX=`pwd` && mkdir build && cd build && cmake -DXA_INC=$PWDX/x86_adapt/library/include -DXA_LIB=$PWDX/x86_adapt/build/ -DCMAKE_BUILD_TYPE=Debug .. && cmake --build .
+  - cd ../tests && ./test.sh travis

@@ -27,7 +27,7 @@
 #ifndef DVFS_H_
 #define DVFS_H_
 
-#include <stdint.h>
+#include <inttypes.h>
 #include <dlfcn.h>
 #include <libconfig.h>
 

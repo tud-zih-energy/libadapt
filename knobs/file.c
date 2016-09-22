@@ -27,6 +27,7 @@
 
 #include <string.h>
 
+
 /* if realloc fail something is particular fail 
  * but we're going on and process the settings there fit in the memory
  * */
@@ -73,7 +74,7 @@ int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char *
       /* get the settings */
       info->filename[i]=strdup(config_setting_get_string(setting));
       /* open file for later write */
-      info->fd[i]=open(info->filename[i],O_CREAT | O_WRONLY | O_APPEND,S_IRUSR| S_IWUSR);
+      info->fd[i]=open(info->filename[i],O_CREAT | O_RDWR | O_APPEND,S_IRUSR| S_IWUSR);
 
       /* string to write in file before */
       sprintf(buffer, "%s.%s_%d.before", prefix, FILE_CONFIG_STRING,i);
@@ -99,7 +100,8 @@ int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char *
       else
         info->value_after[i]=NULL;
 
-    } else
+    }
+    else
       break;
 
   }
@@ -109,14 +111,29 @@ int file_read_from_config(void * vp,struct config_t * cfg, char * buffer, char *
 
 int file_process_before(void * vp, int ignored){
   int i;
-  struct file_information * info=vp;
-  if (info->value_before==NULL) return 0;
+  struct file_information * info = vp;
+  if (info->value_before == NULL) return 0;
 
-  for (i=0;i<info->nr_files;i++){
-    if (info->value_before[i]!=NULL){
-      if(write(info->fd[i],info->value_before[i],info->value_before_len[i]) != info->value_before_len[i]) {
+  for (i=0; i<info->nr_files; i++){
+    if (info->value_before[i] != NULL){
+#ifdef VERBOSE
+      fprintf(stderr, "Write to file %s: %s\n", info->filename[i], info->value_before[i]);
+#endif
+      if(write(info->fd[i], info->value_before[i], info->value_before_len[i]) != info->value_before_len[i]) {
+#ifdef VERBOSE
+        fprintf(stderr, "Writing before process failed for file %s\n", *(info->filename));
+#endif
         return 1;
       }
+#ifdef VERBOSE
+      char * buffer;
+      buffer = calloc(info->value_before_len[i] + 1, sizeof(char));
+      lseek(info->fd[i], -info->value_before_len[i], SEEK_CUR);
+      read(info->fd[i], buffer, info->value_before_len[i]);
+      buffer[info->value_after_len[i]] = '\0';
+      fprintf(stderr, "Value in file: %s", buffer);
+      free(buffer);
+#endif
     }
   }
   return 0;
@@ -124,13 +141,29 @@ int file_process_before(void * vp, int ignored){
 
 int file_process_after(void * vp, int ignored){
   int i;
-  struct file_information * info=vp;
-  if (info->value_after==NULL) return 0;
+  struct file_information * info = vp;
+  if (info->value_after == NULL) return 0;
 
   for (i=0;i<info->nr_files;i++){
-    if (info->value_after[i]!=NULL){
-      if (write(info->fd[i],info->value_after[i],info->value_after_len[i]) != info->value_after_len[i])
+    if (info->value_after[i] != NULL){
+#ifdef VERBOSE
+      fprintf(stderr, "Write to file %s: %s\n", info->filename[i], info->value_after[i]);
+#endif
+      if (write(info->fd[i], info->value_after[i], info->value_after_len[i]) != info->value_after_len[i]) {
+#ifdef VERBOSE
+        fprintf(stderr, "Writing after process failed for file %s\n", *(info->filename));
+#endif
         return 1;
+      }
+#ifdef VERBOSE
+      char * buffer;
+      buffer = calloc(info->value_after_len[i] + 1, sizeof(char));
+      lseek(info->fd[i], -info->value_after_len[i], SEEK_CUR);
+      read(info->fd[i], buffer, info->value_after_len[i]);
+      buffer[info->value_after_len[i]] = '\0';
+      fprintf(stderr, "Value in file: %s", buffer);
+      free(buffer);
+#endif
     }
   }
   return 0;

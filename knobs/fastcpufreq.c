@@ -31,7 +31,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-/* #define VERBOSE 1 */
 
 /* find the greatest common divisor, if x == 0 it returns y */
 static unsigned long gcd(unsigned long x, unsigned long y) {

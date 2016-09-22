@@ -14,7 +14,7 @@ cd $TMPDIR
 for lib in ${LIBS[@]}
 do
     ar x $lib
-    echo "unpacking $lib"
+    # echo "unpacking $lib"
 done
 
 #create new static linked library
