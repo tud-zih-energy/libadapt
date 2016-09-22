@@ -68,7 +68,7 @@ init:
     dvfs_freq_before=$init_dvfs_freq_before;
     dvfs_freq_after=$init_dvfs_freq_after;
 
-}
+};
 
 default:
 {
@@ -77,7 +77,7 @@ default:
     dct_threads_after=$def_dct_threads_after;
     dvfs_freq_before=$def_dvfs_freq_before;
     dvfs_freq_after=$def_dvfs_freq_after;
-}
+};
 
 binary_0:
 {
@@ -96,7 +96,7 @@ binary_0:
     # now we test files
     function_1:
     {
-	name="test_file"
+	name="test_file";
 	# write something to this file whenever a region is entered
 	file_0:
 	{
@@ -326,7 +326,7 @@ elif [ "$1" = "log" ]; then
     run verbose ${@:2} >run.log 2>run_error.log && \
     evaluate run.log && \
     clean
-elif [ "$1" = "verbose"  ]; then
+elif [ "$1" = "verbose" ]; then
     # with verbose you get a full output with a little trick we can also use evalute()
     config && \
     build && \
@@ -337,6 +337,15 @@ elif [ "$1" = "verbose"  ]; then
     run verbose ${@:2} >run.log 2>/dev/null && \
     evaluate run.log && \
     clean log
+elif [ "$1" = "self" ]; then
+    # don'r recompile the sources in ../build
+    config >/dev/null 2>&1 && \
+    build self >/dev/null 2>&1 && \
+    prepare >/dev/null 2>&1 && \
+    compile >/dev/null 2>&1 && \
+    run machine ${@:2} > run.log 2>/dev/null && \
+    evaluate run.log  && \
+    clean log conf
 else
     # with other parameters the user get a minimal output and can chose the tests
     config >/dev/null 2>&1 && \

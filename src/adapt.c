@@ -161,11 +161,9 @@ int adapt_open()
 
   if (!config_read_file(&cfg, file_name))
   {
-    fprintf(error_stream, "reading config file %s failed\n", file_name);
+    fprintf(error_stream, "Reading config file %s failed\n", file_name);
     fprintf(error_stream, "Informations from libconfig:\n");
-    fprintf(error_stream, "File: %d\n", config_error_type(&cfg));
-    fprintf(error_stream, "File: %s\n", config_error_file(&cfg));
-    fprintf(error_stream, "Line: %d\n", config_error_line(&cfg));
+    fprintf(error_stream, "Line number: %d\n", config_error_line(&cfg));
     fprintf(error_stream, "Text: %s\n", config_error_text(&cfg));
     return 1;
   }
