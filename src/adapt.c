@@ -411,7 +411,7 @@ int adapt_def_region(uint64_t binary_id, const char* rname, uint32_t rid)
     return add_rid2crid(binary_id,rid,crid);
   }
 #ifdef VERBOSE
-  fprintf(error_stream,"For Region: %s RID %" PRIu32 "is already registered\n");
+  fprintf(error_stream,"For Region: %s RID %" PRIu32 " is already registered\n", rname, rid);
 #endif
   return 1;
 }
