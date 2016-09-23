@@ -25,6 +25,10 @@
 
 #include "adapt.h"
 
+#ifdef X86_ADAPT
+#include "x86_adapt.h"
+#endif
+
 /* hardcoded path to control the frequency scaling */
 #define SCALING_CUR_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
 
@@ -158,12 +162,12 @@ test_dct(uint64_t bid, int message)
     
     print_category(message, category);
 
-    error |= def_region(message, category, bid, rid);
-
     if ( message == 1 ) printf("Threads:\n");
     printf("init_dct_threads_before=");
     print_threads();
     printf("\n");
+
+    error |= def_region(message, category, bid, rid);
 
     error |= enter_stacks(message, bid, rid);
 
@@ -196,12 +200,12 @@ test_dvfs(uint64_t bid, int message)
 
     if ( message == 1 ) printf("\nFile %s \n", SCALING_CUR_FREQ);
 
-    error |= def_region(message, category, bid, rid);
-    
     if ( message == 1 ) printf("\nFreq:\n");
     printf("init_dvfs_freq_before=");
     cat(SCALING_CUR_FREQ, 0);
     printf("\n");
+
+    error |= def_region(message, category, bid, rid);
 
     error |= enter_stacks(message, bid, rid);
 
@@ -237,7 +241,7 @@ test_file(uint64_t bid, int message, char * filename)
     error |= enter_stacks(message, bid, rid);
 
     if ( message == 1 ) printf("\nFile %s:\n", filename);
-    printf("bin_file_before_clear=");
+    printf("bin_file_before=");
     overhead = cat(filename, 0);
     printf("\n");
 
@@ -247,7 +251,7 @@ test_file(uint64_t bid, int message, char * filename)
     error |= exit_stacks(message, bid, rid);
 
     if ( message == 1 ) printf("\nFile %s:\n", filename);
-    printf("bin_file_after_clear=");
+    printf("bin_file_after=");
     cat(filename, overhead);
     printf("\n");
 
@@ -255,6 +259,54 @@ test_file(uint64_t bid, int message, char * filename)
 
     return error;
 }
+
+#ifdef X86_ADAPT
+/* frequency/dvfs behavior */
+int
+test_x86_adapt(uint64_t bid, int message, char * option)
+{
+    char * category = "x86_adapt";
+    int error = 0;
+    uint32_t rid = 8;
+
+    int fd, index;
+    uint64_t setting;
+
+    print_category(message, category);
+
+    error |= x86_adapt_init();
+    if ( message == 1  ) printf("Init returned error code: %d\n", error);
+    fd = x86_adapt_get_device(X86_ADAPT_CPU, 0);
+    if ( fd < 0 ) error |= 1;
+    index = x86_adapt_lookup_ci_name(X86_ADAPT_CPU, option);
+
+    error |= def_region(message, category, bid, rid);
+
+    error |= enter_stacks(message, bid, rid);
+
+    if ( message == 1 ) printf("\nOption: %s\n", option);
+    printf("bin_x86_adapt_before=");
+    if ( x86_adapt_get_setting(fd, index, &setting) < 0 ) error |= 1;
+    printf("%" PRIu64, setting);
+    printf("\n");
+
+    error |= exit_stacks(message, bid, rid);
+
+    if ( message == 1 ) printf("\nOption: %s\n", option);
+    printf("bin_x86_adapt_after=");
+    if ( x86_adapt_get_setting(fd, index, &setting) < 0 ) error |= 1;
+    printf("%" PRIu64, setting);
+    printf("\n");
+
+    x86_adapt_set_setting(fd, index, 0);
+
+    x86_adapt_finalize();
+
+    if ( message == 1 ) printf("*********\n");
+
+    return error;
+}
+#endif
 
 
 /*Main funtion to parse command line arguments and execute specific tests */
@@ -264,11 +316,20 @@ main(int argc, char **argv)
     /* standard filename for the test file to read */
     char * filename = "./test_file";
 
+    /* standard option for x86_adapt */
+    char * option = "Intel_Clock_Modulation";
+
     /* const variables for better code */
     static const int verbose = 1, machine = 2;
     int message = verbose;
 
     static int dct = 1, dvfs = 2, file = 4;
+#ifdef X86_ADAPT
+    static int x86_adapt = 8;
+#else
+    static int x86_adapt = 0;
+#endif
+
     int test = 0;
 
     int error = 0;
@@ -294,14 +355,21 @@ main(int argc, char **argv)
             test += dvfs;
         else if ( strcmp(*argv, "file") == 0 )
             test += file;
+        else if ( strcmp(*argv, "x86_adapt") == 0  )
+            test += x86_adapt;
         else if ( strcmp(*argv, "all") == 0 )
-            test = dct + dvfs + file;
+            test = dct + dvfs + file + x86_adapt;
         else if ( strstr(*argv, "/") != NULL )
             filename = *argv;
+        else if ( strstr(*argv, "x86_adapt_") != NULL  )
+        {
+            option = strstr(*argv, "x86_adapt_");
+            option = &option[strlen("x86_adapt_")];
+        }
     }
     /* if atfer all this the test scenario wasn't set we will set it */
     if ( test == 0 )
-        test = dct + dvfs + file;
+        test = dct + dvfs + file + x86_adapt;
 
     /* open adapt and init everything */
     if (message == 1) printf("\nOpen adapter \n");
@@ -311,6 +379,15 @@ main(int argc, char **argv)
     /* get binary id */
     if ( message == 1 ) printf("\nAdd binary \n");
     uint64_t bid = adapt_add_binary("test");
+
+#ifdef X86_ADAPT
+    /* test for x86_adapt_behavior */
+    if ( test - x86_adapt >= 0 )
+    {
+        error |= test_x86_adapt(bid, message, option);
+        test -= x86_adapt;
+    }
+#endif
 
     /* test for file handling */
     if ( test - file >= 0 )

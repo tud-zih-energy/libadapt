@@ -4,24 +4,25 @@ the libadapt and the test programm for you
 
 Command line options for test.c:
 
-| option  | explanation                                 |
-| ------- | ------------------------------------------- |
-| verbose | verbose output                              |
-| machine | parseable output                            |
-| dct     | enable dct or threads testing               |
-| dvfs    | enable dvfs or frequency scaling testing    |
-| file    | enable test for file writing                |
-| all     | enable all tests                            |
+| option    | explanation                                 |
+| --------- | ------------------------------------------- |
+| verbose   | verbose output                              |
+| machine   | parseable output                            |
+| dct       | enable dct or threads testing               |
+| dvfs      | enable dvfs or frequency scaling testing    |
+| file      | enable test for file writing                |
+| x86_adapt | enable testing with x86_adapt library       |
+| all       | enable all tests                            |
 
 Command line options for test.sh:
 
-| option  | explanation                                     |
-| ------- | ----------------------------------------------- |
-| travis  | use for travis build                            |
-| testsys | use for testsys, will enable dvfs and use logs  |
-| self    | don't recompile in ../build                     |
-| log     | use logs                                        |
-| verbose | verbose output                                  |
+| option    | explanation                                     |
+| --------- | ----------------------------------------------- |
+| travis    | use for travis build                            |
+| testsys   | use for testsys, will enable dvfs and use logs  |
+| self      | don't recompile in ../build                     |
+| log       | use logs                                        |
+| verbose   | verbose output                                  |
  
 All other command line options will directly passed to test.c
 
