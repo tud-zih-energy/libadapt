@@ -30,12 +30,46 @@ COL=$(tput cols)
 config() {
     ## Function to create the config file from the given values so that we can proof
     ## if them applied the right way
- 
+    
+    freq_path="/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies"
+
+    # make frequencies depend on the host
+    if [ -r $freq_path  ]; then
+	freqs="$(cat $freq_path)"
+    else
+	freqs="1000"
+    fi
+
+    # count how many frequencies do we have
+    i=1
+    while [ "$(echo $freqs | cut -d ' ' -f $i)" != ""  ]; do
+	prev=$(echo $freqs | cut -d ' ' -f $i)
+	i=$(($i+1))
+	next=$(echo $freqs | cut -d ' ' -f $i)
+
+	if [ "$prev" = "$next" ]; then
+	    i=$(($i-1))
+	    break
+	fi
+    done
+
+    # use $(print_freq) to create host specfic frequencies
+    # this wouldn't work in the zsh in a subshell
+    print_freq() {
+	if [ $i -gt 1 ]; then
+	    echo $freqs | cut -d ' ' -f $(($RANDOM % ($i - 1) + 1))
+	else
+	    echo $freqs
+	fi
+    }
+
     ## init
     export init_dct_threads_before=3
     export init_dct_threads_after=4
-    export init_dvfs_freq_before=1200000
-    export init_dvfs_freq_after=2000000
+    export init_dvfs_freq_before=1600000
+    # after adapt_close() the previous cpu gouvernor will be loaded and so this
+    # option doesn't make any sense and we are not test for this
+    init_dvfs_freq_after=2000000
 
     ## default
     export def_dct_threads_before=7
@@ -55,6 +89,9 @@ config() {
     bin_file_after_dirty="\"$bin_file_after\n\""
     export bin_dvfs_freq_before=1300000
     export bin_dvfs_freq_after=2500000
+    export bin_x86_adapt_option="x86_adapt_Intel_Clock_Modulation"
+    export bin_x86_adapt_before=19
+    export bin_x86_adapt_after=21
 
     ## create config
     if [ ! -f $(pwd)/example_config ]; then
@@ -118,13 +155,13 @@ binary_0:
 
     };
 
-    # and last but not least we test x86_adapt
+    # and last but not least x86_adapt
     function_3:
     {
-	name="test_x86a";
-	# change settings from cc device driver
-	#x86_adapt_AMD_Stride_Prefetch_before = 1;
-	#x86_adapt_AMD_Stride_Prefetch_after = 0;
+	name="test_x86_adapt";
+	# we are very variable in the settings
+	${bin_x86_adapt_option}_before=$bin_x86_adapt_before;
+	${bin_x86_adapt_option}_after=$bin_x86_adapt_after;
 
     };
 };
@@ -133,25 +170,88 @@ EOF
 fi
 }
 
+build_x86_adapt() {
+    ## Function to build x86_adapt if necessary
+
+    status=0
+    count_modules=0
+
+    # save original directory and go ahead
+    PREV="$(pwd)"
+    cd ../
+
+    # fetch sources if we need them
+    [ ! -d x86_adapt ] && git clone https://github.com/tud-zih-energy/x86_adapt.git
+
+    # start to build
+    cd x86_adapt
+    if [ -d build ]; then
+	cd build
+	cmake --build .
+	status=$(($status + $?))
+    else
+	mkdir build && cd build
+	cmake ..
+	status=$(($status + $?))
+	cmake --build .
+	status=$(($status + $?))
+    fi
+
+    # first module unloading because we want to use our fresh
+    for module in x86_adapt_driver x86_adapt_defs; do
+	if $(lsmod | grep $module -q); then
+	    if $(which sudo > /dev/null 2>&1); then
+		sudo rmmod $module || count_modules=$(($count_modules + 1))
+		echo "unload $module"
+	    else
+		echo "Sudo is not available, maybe we can't unload the modules"
+		rmmod $module || count_modules=$(($count_modules + 1))
+		echo "unload $module"
+	    fi
+	fi
+    done
+
+    # and now load the modules
+    # but if the modules are loaded and we are unable to unload them that's also okay
+    if [ ! "$count_modules" = "2"  ]; then
+	if $(which sudo > /dev/null 2>&1); then
+	    sudo insmod kernel_module/definition_driver/x86_adapt_defs.ko
+	    status=$(($status + $?))
+	    sudo insmod kernel_module/driver/x86_adapt_driver.ko
+	    status=$(($status + $?))
+	else
+	    insmod kernel_module/definition_driver/x86_adapt_defs.ko
+	    status=$(($status + $?))
+	    insmod kernel_module/driver/x86_adapt_driver.ko
+	    status=$(($status + $?))
+	fi
+    fi
+
+    # save path to x86_adapt and go back
+    cd ../..
+    export PWDX="$(pwd)"
+    cd $PREV
+
+    return $status
+}
+
 build() {
     ## Function to build the source of libadapt if necessary
 
     # save previous location
     prev="$(pwd)"
 
-    if [ "$1" = "self" -a -d ../build  ]; then
+    status=0
+
+    # on our test systems we can use x86_adapt
+    if [[ $@ =~ "testsys" || $@ =~ "x86_adapt" ]]; then
+	build_x86_adapt
+	status=$(($status + $?))
+    fi
+
+    if [[ $@ =~ "self" && -d ../build  ]]; then
 	# if the sources were already builded and the build dir exists we do nothing
 	build_dir=1
-    elif [ "$1" = "travis" ]; then
-	# on travis we need to clean up because we build previously with x86_adapt,
-	# csl and cpufreq
-	rm -rf  ../build && mkdir ../build && cd ../build
-	# but x86_adapt, csl and cpufreq doesn't work on travis
-	# so we need to disable them to get no errors
-	cmake -DCMAKE_BUILD_TYPE=Debug -DNO_X86_ADAPT=yes -DNO_CPUFREQ=yes -DNO_CSL=yes ../
-	cmake --build .
-	# clean build dir atferwards because we create them
-	build_dir=0
     elif [ -d ../build ]; then
 	# if the build dir exists we compile it again
 	cd ../build
@@ -161,11 +261,19 @@ build() {
 	# if we haven't such a nice environment we make the decision for you
 	echo "No build directory was found so I will try to compile on my own with decent flags"
 	mkdir ../build && cd ../build
-	if [ "$1" = "testsys" -o "$2" = "testsys" ]; then
+	if [[ $@ =~ "testsys" || ( $@ =~ "x86_adapt" && $@ =~ "dvfs" ) ]]; then
 	    # on our testsystem we have sudo and can use cpufreq
+	    cmake -DCMAKE_BUILD_TYPE=Debug -DXA_INC=$PWDX/x86_adapt/library/include -DXA_LIB=$PWDX/x86_adapt/build ../
+	    status=$(($status + $?))
+	elif [[ $@ =~ "x86_adapt" ]]; then
+	    cmake -DCMAKE_BUILD_TYPE=Debug -DNO_CPUFREQ=yes -DXA_INC=$PWDX/x86_adapt/library/include -DXA_LIB=$PWDX/x86_adapt/build ../
+	    status=$(($status + $?))
+	elif [[ $@ =~ "dvfs" ]]; then
 	    cmake -DCMAKE_BUILD_TYPE=Debug -DNO_X86_ADAPT=yes ../
+	    status=$(($status + $?))
 	else
 	    cmake -DCMAKE_BUILD_TYPE=Debug -DNO_X86_ADAPT=yes -DNO_CPUFREQ=yes ../
+	    status=$(($status + $?))
 	fi
 	cmake --build .
 	# clean build dir
@@ -174,6 +282,8 @@ build() {
 
     # change to the directory where we was before the build starts
     cd $prev
+
+    return $status
 }
 
 prepare() {
@@ -187,10 +297,17 @@ prepare() {
     cp ../build/libadapt.so .
     # test file
     touch $bin_file_name
+    # file for x86_adapt if necessary
+    if [ -d ../x86_adapt ]; then
+	cp ../x86_adapt/library/include/x86_adapt.h .
+	cp ../x86_adapt/build/libx86_adapt.so .
+    fi
 }
 
 compile() {
     ## Function to compile the test program
+
+    status=0
 
     if [ -f test.c ]; then
 	# compile source
@@ -199,12 +316,20 @@ compile() {
 	# otherwise we get undefined reference errors from __dlerror and __dlsym
 	#gcc -Wl,--no-as-needed -ldl test.c libadapt_static.a -fopenmp -o test
 	# so we use the dynamic linked one
-	gcc test.c -L. -ladapt -fopenmp -o test
+	if [[ $@ =~ "testsys" || $@ =~ "x86_adapt" ]]; then
+	    echo "Compile with x86_adapt testing!"
+	    gcc test.c -L. -ladapt -lx86_adapt -fopenmp -DX86_ADAPT -o test
+	else
+	    gcc test.c -L. -ladapt -fopenmp -o test
+	fi
+	status=$(($status + $?))
     else
 	# error if we have not source for our test
 	echo "I didn't find the source code for my test program. So, I will do nothing"
 	status=1
     fi
+
+    return $status
 }
 
 run() {
@@ -213,19 +338,24 @@ run() {
     # print a nice info
     echo; echo "Running the test progam"; echo "======================="
     # only use sudo if it's possible
-    if $(which sudo > /dev/null 2>&1); then
+    if $(which sudo > /dev/null 2>&1) && $(which taskset > /dev/null 2>&1); then
 	# LD_LIBRARY_PATH is necessary if we used dynamic linked library
 	# give all parameters passed to the function to the test program
-	sudo ADAPT_CONFIG_FILE="$(pwd)/example_config" LD_LIBRARY_PATH="$(pwd)/../build/" ./test "$@"
-	# save status of the previous executed command
-	status="$?"
+	sudo ADAPT_CONFIG_FILE="$(pwd)/example_config" LD_LIBRARY_PATH="$(pwd)/" taskset -c 0 ./test $bin_file_name $bin_x86_adapt_option "$@"
+	status=$(($status + $?))
+    elif $(which sudo > /dev/null 2>&1); then
+	echo "Taskset is needed for a successfully dvfs testing"
+	sudo ADAPT_CONFIG_FILE="$(pwd)/example_config" LD_LIBRARY_PATH="$(pwd)/" ./test $bin_file_name $bin_x86_adapt_option "$@"
+	status=$(($status + $?))
     else
 	# info if we have no sudo
-	echo "Sudo is not avaible. So need the right permissions to set the frequency"
-	ADAPT_CONFIG_FILE="$(pwd)/example_config" LD_LIBRARY_PATH="$(pwd)/../build/" ./test "$@"
-	status="$?"
+	echo "Sudo is not available. So need the right permissions to set the frequency"
+	ADAPT_CONFIG_FILE="$(pwd)/example_config" LD_LIBRARY_PATH="$(pwd)/" ./test $bin_file_name $bin_x86_adapt_option "$@"
+	status=$(($status + $?))
     fi
     echo "======================="; echo "Done"; echo
+
+    return $status
 }
 
 clean() {
@@ -241,16 +371,19 @@ clean() {
     rm libadapt*
     # logs if they won't needed anymore
     if [ "$1" = "log" -o "$2" = "log"  ]; then
-	rm *.log || status=1
+	rm *.log
     fi
     # and the same for the config
     if [ "$1" = "conf" -o "$2" = "conf"  ]; then
-	rm example_config || status=1
+	rm example_config
     fi
     # remove build dir, if we have create it
     if [ $build_dir -eq 0 ]; then
 	rm -r ../build
     fi
+    # and everythin from x86_adapt
+    [ -f libx86_adapt.so ] && rm libx86_adapt.so
+    [ -f x86_adapt.h ] && rm x86_adapt.h
 }
 
 evaluate() {
@@ -281,18 +414,40 @@ evaluate() {
 	    fi
 	fi
     done
+
+    return $status
 }
 
 
-## Main 
+## Main
+# get some commands together to reduce the complexity
+until_run_no_output() {
+    config >/dev/null 2>&1 && \
+    build $@ >/dev/null 2>&1 && \
+    prepare >/dev/null 2>&1 && \
+    compile $@ >/dev/null 2>&1
+}
+
+until_run_logs() {
+    config >config.log && \
+    build $@ >build.log && \
+    prepare >prepare.log && \
+    compile $@ >compile.log
+}
+
+until_run_verbose() {
+    config && \
+    build $@ && \
+    prepare && \
+    compile $@
+}
+
+# start with the command line option parsing
 if [ "$1" = "" ]; then
     # without a parameter we use only tests that should work on every computer and
     # pipe the output to /dev/null
     # so only the fail or sucess of the evaluate() is printed
-    config >/dev/null 2>&1 && \
-    build >/dev/null 2>&1 && \
-    prepare >/dev/null 2>&1 && \
-    compile >/dev/null 2>&1 && \
+    until_run_no_output $@ && \
     run machine dct file >run.log 2>/dev/null && \
     evaluate run.log  && \
     clean log conf
@@ -300,63 +455,45 @@ elif [ "$1" = "travis" ]; then
     # if we use travis we have no abillity to change the frequency
     # we want a full output and didn't need to clean up
     # evaluate and full output need a little trick to work properly
-    config && \
-    build travis && \
-    prepare && \
-    compile && \
-    run verbose file dct && \
+    until_run_verbose $@ && \
+    run verbose dct file && \
     echo -n "" > $bin_file_name && \
-    run verbose file dct > run.log 2>/dev/null && \
+    run verbose dct file > run.log 2>/dev/null && \
     evaluate run.log 
 elif [ "$1" = "testsys" ]; then
     # on a test system we create logs to proof them afterwards
-    config >config.log && \
-    build testsys >build.log && \
-    prepare >prepare.log && \
-    compile >compile.log && \
-    run verbose ${@:2} >run.log 2>run_error.log && \
+    until_run_logs $@ && \
+    run verbose $@ >run.log 2>run_error.log && \
     evaluate run.log && \
     clean
 elif [ "$1" = "log" ]; then
     # if the user want some logs we create them
-    config >config.log && \
-    build >build.log && \
-    prepare >prepare.log && \
-    compile >compile.log && \
-    run verbose ${@:2} >run.log 2>run_error.log && \
+    until_run_logs $@ && \
+    run verbose $@ >run.log 2>run_error.log && \
     evaluate run.log && \
     clean
 elif [ "$1" = "verbose" ]; then
     # with verbose you get a full output with a little trick we can also use evalute()
-    config && \
-    build && \
-    prepare && \
-    compile && \
-    run verbose ${@:2} && \
+    until_run_verbose $@ && \
+    run $@ && \
     echo -n "" > $bin_file_name && \
-    run verbose ${@:2} >run.log 2>/dev/null && \
+    run $@ >run.log 2>/dev/null && \
     evaluate run.log && \
     clean log
 elif [ "$1" = "self" ]; then
     # don'r recompile the sources in ../build
-    config >/dev/null 2>&1 && \
-    build self >/dev/null 2>&1 && \
-    prepare >/dev/null 2>&1 && \
-    compile >/dev/null 2>&1 && \
-    run machine ${@:2} > run.log 2>/dev/null && \
+    until_run_no_output $@ && \
+    run machine $@ > run.log 2>/dev/null && \
     evaluate run.log  && \
     clean log conf
 else
     # with other parameters the user get a minimal output and can chose the tests
-    config >/dev/null 2>&1 && \
-    build >/dev/null 2>&1 && \
-    prepare >/dev/null 2>&1 && \
-    compile >/dev/null 2>&1 && \
+    until_run_no_output $@ && \
     run machine $@ > run.log 2>/dev/null && \
     evaluate run.log  && \
     clean log conf
 fi
 
-# return suces or fail
+# return sucess or fail
 exit $status
 

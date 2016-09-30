@@ -106,11 +106,12 @@ libadapt uses CMake for building. You can provide the following options to cmake
 * `-DXA_DIR=...`, `-DXA_INC=...`, `-DXA_LIB=...` can be used to give cmake a hint where libx86_adapt and its headers are installed
 * `-DNO_CPUFREQ=On` if you want to build without libcpufreq support
 * `-DNO_X86_ADAPT=On` if you want to build without libx86_adapt support
-* 
+* `-DNO_CSL=On` if you want to build without C-state limiting support 
 ```
 mkdir build
 cd build
 cmake -DNO_CPUFREQ=On ..
+cmake --build .
 ```
 
 ## Citing
