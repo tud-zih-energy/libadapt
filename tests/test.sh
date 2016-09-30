@@ -338,7 +338,7 @@ run() {
     # print a nice info
     echo; echo "Running the test progam"; echo "======================="
     # only use sudo if it's possible
-    if [ $(which sudo > /dev/null 2>&1) -a $(which taskset > /dev/null 2>&1) ]; then
+    if $(which sudo > /dev/null 2>&1) && $(which taskset > /dev/null 2>&1); then
 	# LD_LIBRARY_PATH is necessary if we used dynamic linked library
 	# give all parameters passed to the function to the test program
 	sudo ADAPT_CONFIG_FILE="$(pwd)/example_config" LD_LIBRARY_PATH="$(pwd)/" taskset -c 0 ./test $bin_file_name $bin_x86_adapt_option "$@"

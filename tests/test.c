@@ -32,6 +32,17 @@
 /* hardcoded path to control the frequency scaling */
 #define SCALING_CUR_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
 
+/* define variables for test environment */
+#define TEST_DCT (1<<0)
+#define TEST_DVFS (1<<1)
+#define TEST_FILE (1<<2)
+#ifdef X86_ADAPT
+    #define TEST_X86ADAPT (1<<3)
+#else
+    #define TEST_X86ADAPT 0
+#endif
+
+
 /* Print nice header for a category */
 void
 print_category(int message, char * category)
@@ -323,15 +334,9 @@ main(int argc, char **argv)
     static const int verbose = 1, machine = 2;
     int message = verbose;
 
-    static int dct = 1, dvfs = 2, file = 4;
-#ifdef X86_ADAPT
-    static int x86_adapt = 8;
-#else
-    static int x86_adapt = 0;
-#endif
-
+    /* variables for test execution */
     int test = 0;
-
+    int executed_tests = 0;
     int error = 0;
 
     /* parse command line arguments */
@@ -350,15 +355,15 @@ main(int argc, char **argv)
         else if ( strcmp(*argv, "machine") == 0 )
             message = machine;
         else if ( strcmp(*argv, "dct") == 0 )
-            test += dct;
+            test |= TEST_DCT;
         else if ( strcmp(*argv, "dvfs") == 0 )
-            test += dvfs;
+            test |= TEST_DVFS;
         else if ( strcmp(*argv, "file") == 0 )
-            test += file;
+            test |= TEST_FILE;
         else if ( strcmp(*argv, "x86_adapt") == 0  )
-            test += x86_adapt;
+            test |= TEST_X86ADAPT;
         else if ( strcmp(*argv, "all") == 0 )
-            test = dct + dvfs + file + x86_adapt;
+            test = TEST_DCT | TEST_DVFS | TEST_FILE | TEST_X86ADAPT;
         else if ( strstr(*argv, "/") != NULL )
             filename = *argv;
         else if ( strstr(*argv, "x86_adapt_") != NULL  )
@@ -369,7 +374,7 @@ main(int argc, char **argv)
     }
     /* if atfer all this the test scenario wasn't set we will set it */
     if ( test == 0 )
-        test = dct + dvfs + file + x86_adapt;
+        test = TEST_DCT | TEST_DVFS | TEST_FILE | TEST_X86ADAPT;
 
     /* open adapt and init everything */
     if (message == 1) printf("\nOpen adapter \n");
@@ -382,40 +387,43 @@ main(int argc, char **argv)
 
 #ifdef X86_ADAPT
     /* test for x86_adapt_behavior */
-    if ( test - x86_adapt >= 0 )
+    if ( test & TEST_X86ADAPT )
     {
         error |= test_x86_adapt(bid, message, option);
-        test -= x86_adapt;
+        test -= TEST_X86ADAPT;
     }
 #endif
 
     /* test for file handling */
-    if ( test - file >= 0 )
+    if ( test & TEST_FILE )
     {
         error |= test_file(bid, message, filename);
-        test -= file;
+        test -= TEST_FILE;
     }
 
     /* test for dvfs or frequency scaling */
-    if ( test - dvfs >= 0)
+    if ( test & TEST_DVFS)
     {
         error |= test_dvfs(bid, message);
-        test -= dvfs;
-        dvfs = 0;
+        test -= TEST_DVFS;
+        executed_tests |= TEST_DVFS;
     }
 
     /* test for dct or thread handling */
-    if ( test - dct >= 0 )
+    if ( test & TEST_DCT )
     {
         error |= test_dct(bid, message);
-        test -= dct;
-        dct = 0;
+        test -= TEST_DCT;
+        executed_tests |= TEST_DCT;
     }
     
     /* test should be zero after all of these tests otherwise something went
      * wrong */
     if ( test != 0 )
+    {
+        printf("Something went wrong with the tests, status: %d", test);
         error |= 2;
+    }
 
     /* after our work we need to clean up */
     if ( message == 1 ) printf("\nClose adapter\n");
@@ -424,21 +432,23 @@ main(int argc, char **argv)
     /* and we should control if everything is set correctly after close */
     print_category(message, "after closing");
 
-    if ( dvfs == 0  )
+    if ( executed_tests & TEST_DVFS )
     {
         if ( message == 1 ) { printf("Test dvfs\n"); printf("Freq:\n"); }
         printf("init_dvfs_freq_after=");
         cat(SCALING_CUR_FREQ, 0);
         printf("\n");
         if ( message == 1 ) printf("\n");
+        executed_tests &= TEST_DVFS;
     }
 
-    if ( dct == 0 )
+    if ( executed_tests & TEST_DCT )
     {
         if ( message == 1 ) { printf("Test dct\n"); printf("Threads:\n"); }
         printf("init_dct_threads_after=");
         print_threads();
         printf("\n");
+        executed_tests &= TEST_DCT;
     }
 
     /* give back an good error code */
