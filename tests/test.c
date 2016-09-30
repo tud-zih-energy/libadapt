@@ -390,7 +390,7 @@ main(int argc, char **argv)
     if ( test & TEST_X86ADAPT )
     {
         error |= test_x86_adapt(bid, message, option);
-        test -= TEST_X86ADAPT;
+        test &= ~TEST_X86ADAPT;
     }
 #endif
 
@@ -398,14 +398,14 @@ main(int argc, char **argv)
     if ( test & TEST_FILE )
     {
         error |= test_file(bid, message, filename);
-        test -= TEST_FILE;
+        test &= ~TEST_FILE;
     }
 
     /* test for dvfs or frequency scaling */
     if ( test & TEST_DVFS)
     {
         error |= test_dvfs(bid, message);
-        test -= TEST_DVFS;
+        test &= ~TEST_DVFS;
         executed_tests |= TEST_DVFS;
     }
 
@@ -413,7 +413,7 @@ main(int argc, char **argv)
     if ( test & TEST_DCT )
     {
         error |= test_dct(bid, message);
-        test -= TEST_DCT;
+        test &= ~TEST_DCT;
         executed_tests |= TEST_DCT;
     }
     
@@ -439,7 +439,7 @@ main(int argc, char **argv)
         cat(SCALING_CUR_FREQ, 0);
         printf("\n");
         if ( message == 1 ) printf("\n");
-        executed_tests &= TEST_DVFS;
+        executed_tests &= ~TEST_DVFS;
     }
 
     if ( executed_tests & TEST_DCT )
@@ -448,7 +448,7 @@ main(int argc, char **argv)
         printf("init_dct_threads_after=");
         print_threads();
         printf("\n");
-        executed_tests &= TEST_DCT;
+        executed_tests &= ~TEST_DCT;
     }
 
     /* give back an good error code */
