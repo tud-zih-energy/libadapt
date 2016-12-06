@@ -130,14 +130,15 @@ int x86_adapt_read_from_config(void * vp,struct config_t * cfg, char * buffer,
   if (set)
   {
     cpu_fds=(int*)calloc(x86_adapt_get_nr_avaible_devices(X86_ADAPT_CPU),sizeof(int));
-		for (i=0;i<x86_adapt_get_nr_avaible_devices(X86_ADAPT_CPU);i++)
-		{
-			cpu_fds[i]=x86_adapt_get_device(X86_ADAPT_CPU,i);
-		}
+    for (i=0;i<x86_adapt_get_nr_avaible_devices(X86_ADAPT_CPU);i++)
+    {
+      cpu_fds[i]=x86_adapt_get_device(X86_ADAPT_CPU,i);
+    }
     die_fds=(int*)calloc(x86_adapt_get_nr_avaible_devices(X86_ADAPT_DIE),sizeof(int));
-		{
-			die_fds[i]=x86_adapt_get_device(X86_ADAPT_DIE,i);
-		}
+		for (i=0;i<x86_adapt_get_nr_avaible_devices(X86_ADAPT_DIE);i++)
+    {
+      die_fds[i]=x86_adapt_get_device(X86_ADAPT_DIE,i);
+    }
   }
   return set;
 }
