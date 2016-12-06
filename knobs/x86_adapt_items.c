@@ -235,10 +235,12 @@ int x86_adapt_process_after(void * vp, int32_t cpu)
 
 int x86_adapt_reset(){
    int i;
+   printf("Reset x86a\n");
    for ( i = 0;i < x86_adapt_get_nr_avaible_devices(X86_ADAPT_CPU); i++ )
    {
      if ( cpu_fds[i] > 0 )
      {
+       printf("Reset x86a cpu %d\n",i);
        x86_adapt_set_setting(cpu_fds[i],0,0);
        x86_adapt_put_device(X86_ADAPT_CPU,i);
      }
@@ -247,9 +249,11 @@ int x86_adapt_reset(){
    {
      if ( die_fds[i] > 0 )
      {
+       printf("Reset x86a die %d\n",i);
        x86_adapt_set_setting(die_fds[i],0,0);
        x86_adapt_put_device(X86_ADAPT_DIE,i);
      }
    }
+   printf("Done Reset x86a\n");
    return 0;
 }
