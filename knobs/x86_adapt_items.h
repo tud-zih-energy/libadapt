@@ -32,8 +32,8 @@
 
 struct pref_setting_ids {
   uint64_t setting;
-  int16_t id;
-  int16_t device_type;
+  int id;
+  x86_adapt_device_type type;
 };
 
 struct x86_adapt_pref_information {
